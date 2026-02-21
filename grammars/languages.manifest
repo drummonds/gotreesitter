@@ -29,3 +29,70 @@ elixir https://github.com/elixir-lang/tree-sitter-elixir src .ex,.exs
 graphql https://github.com/bkegley/tree-sitter-graphql src .graphql,.gql
 hcl https://github.com/tree-sitter-grammars/tree-sitter-hcl src .hcl,.tf,.tfvars
 nix https://github.com/nix-community/tree-sitter-nix src .nix
+
+# === tree-sitter org (official) ===
+c_sharp https://github.com/tree-sitter/tree-sitter-c-sharp src .cs
+haskell https://github.com/tree-sitter/tree-sitter-haskell src .hs,.lhs
+julia https://github.com/tree-sitter/tree-sitter-julia src .jl
+ocaml https://github.com/tree-sitter/tree-sitter-ocaml grammars/ocaml/src .ml,.mli
+regex https://github.com/tree-sitter/tree-sitter-regex src .regex
+agda https://github.com/tree-sitter/tree-sitter-agda src .agda
+embedded_template https://github.com/tree-sitter/tree-sitter-embedded-template src .erb,.ejs
+verilog https://github.com/tree-sitter/tree-sitter-verilog src .v,.sv,.svh
+
+# === expansion batch (ts2go probe-verified) ===
+ada https://github.com/briot/tree-sitter-ada src
+angular https://github.com/dlvandenberg/tree-sitter-angular src
+apex https://github.com/aheber/tree-sitter-sfapex apex/src
+arduino https://github.com/ObserverOfTime/tree-sitter-arduino src
+asm https://github.com/RubixDev/tree-sitter-asm src
+astro https://github.com/virchau13/tree-sitter-astro src
+authzed https://github.com/mleonidas/tree-sitter-authzed src
+awk https://github.com/Beaglefoot/tree-sitter-awk src
+bass https://github.com/vito/tree-sitter-bass src
+beancount https://github.com/polarmutex/tree-sitter-beancount src
+bibtex https://github.com/latex-lsp/tree-sitter-bibtex src
+bicep https://github.com/amaanq/tree-sitter-bicep src
+bitbake https://github.com/amaanq/tree-sitter-bitbake src
+blade https://github.com/EmranMR/tree-sitter-blade src
+brightscript https://github.com/ajdelcimmuto/tree-sitter-brightscript src
+caddy https://github.com/opa-oz/tree-sitter-caddy src
+cairo https://github.com/amaanq/tree-sitter-cairo src
+capnp https://github.com/amaanq/tree-sitter-capnp src
+chatito https://github.com/ObserverOfTime/tree-sitter-chatito src
+circom https://github.com/Decurity/tree-sitter-circom src
+cmake https://github.com/uyha/tree-sitter-cmake src
+comment https://github.com/stsewd/tree-sitter-comment src
+commonlisp https://github.com/theHamsta/tree-sitter-commonlisp src
+cooklang https://github.com/addcninblue/tree-sitter-cooklang src
+corn https://github.com/jakestanger/tree-sitter-corn src
+cpon https://github.com/amaanq/tree-sitter-cpon src
+csv https://github.com/amaanq/tree-sitter-csv csv/src
+cuda https://github.com/theHamsta/tree-sitter-cuda src
+cue https://github.com/eonpatapon/tree-sitter-cue src
+cylc https://github.com/elliotfontaine/tree-sitter-cylc src
+d https://github.com/gdamore/tree-sitter-d src
+dart https://github.com/UserNobody14/tree-sitter-dart src
+desktop https://github.com/ValdezFOmar/tree-sitter-desktop src
+devicetree https://github.com/joelspadin/tree-sitter-devicetree src
+diff https://github.com/the-mikedavis/tree-sitter-diff src
+disassembly https://github.com/ColinKennedy/tree-sitter-disassembly src
+djot https://github.com/treeman/tree-sitter-djot src
+dockerfile https://github.com/camdencheek/tree-sitter-dockerfile src
+doxygen https://github.com/amaanq/tree-sitter-doxygen src
+dtd https://github.com/tree-sitter-grammars/tree-sitter-xml dtd/src
+earthfile https://github.com/glehmann/tree-sitter-earthfile src
+ebnf https://github.com/RubixDev/ebnf crates/tree-sitter-ebnf/src
+editorconfig https://github.com/ValdezFOmar/tree-sitter-editorconfig src
+eds https://github.com/uyha/tree-sitter-eds src
+eex https://github.com/connorlay/tree-sitter-eex src
+elm https://github.com/elm-tooling/tree-sitter-elm src
+elsa https://github.com/glapa-grossklag/tree-sitter-elsa src
+enforce https://github.com/simonvic/tree-sitter-enforce src
+erlang https://github.com/WhatsApp/tree-sitter-erlang src
+facility https://github.com/FacilityApi/tree-sitter-facility src
+faust https://github.com/khiner/tree-sitter-faust src
+fennel https://github.com/alexmozaidze/tree-sitter-fennel src
+fidl https://github.com/google/tree-sitter-fidl src
+firrtl https://github.com/amaanq/tree-sitter-firrtl src
+foam https://github.com/FoamScience/tree-sitter-foam src

@@ -60,10 +60,9 @@ func RunBatchManifest(manifestPath, outDir, pkg string) error {
 			return fmt.Errorf("%s: write %s: %w", entry.Name, outFile, err)
 		}
 
-		if q, ok := loadHighlightQuery(repoDir); ok {
-			if err := writeRegisterStub(outDir, entry, q); err != nil {
-				return fmt.Errorf("%s: write register stub: %w", entry.Name, err)
-			}
+		highlightQuery, _ := loadHighlightQuery(repoDir)
+		if err := writeRegisterStub(outDir, entry, highlightQuery); err != nil {
+			return fmt.Errorf("%s: write register stub: %w", entry.Name, err)
 		}
 
 		fmt.Printf("generated %s (%d states, %d symbols)\n", outFile, grammar.StateCount, grammar.SymbolCount)

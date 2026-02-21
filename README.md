@@ -140,31 +140,22 @@ The incremental hot path reuses subtrees aggressively — a single-byte edit rep
 
 ## Supported Languages
 
-25 languages. Run `go run ./cmd/parity_report` to verify.
+33 languages. Run `go run ./cmd/parity_report` to verify.
 
-| Language | Backend | Status | | Language | Backend | Status |
-|---|---|---|---|---|---|---|
-| `bash` | `dfa-partial` | ok | | `lua` | `token_source` | ok |
-| `c` | `token_source` | ok | | `nix` | `dfa-partial` | ok |
-| `cpp` | `token_source` | ok | | `php` | `dfa-partial` | ok |
-| `css` | `dfa-partial` | ok | | `python` | `dfa-partial` | ok |
-| `elixir` | `dfa-partial` | degraded | | `ruby` | `dfa-partial` | ok |
-| `go` | `token_source` | ok | | `rust` | `token_source` | ok |
-| `html` | `token_source` | ok | | `scala` | `dfa-partial` | ok |
-| `java` | `token_source` | ok | | `sql` | `dfa-partial` | ok |
-| `javascript` | `token_source` | ok | | `swift` | `dfa` | ok |
-| `json` | `token_source` | ok | | `toml` | `token_source` | ok |
-| `kotlin` | `dfa-partial` | ok | | `tsx` | `dfa-partial` | ok |
-| | | | | `typescript` | `token_source` | ok |
-| | | | | `yaml` | `dfa-partial` | degraded |
-| | | | | `zig` | `dfa` | ok |
+Current registry:
+`agda`, `bash`, `c`, `c_sharp`, `cpp`, `css`, `elixir`, `embedded_template`, `go`, `haskell`, `html`, `java`, `javascript`, `json`, `julia`, `kotlin`, `lua`, `nix`, `ocaml`, `php`, `python`, `regex`, `ruby`, `rust`, `scala`, `sql`, `swift`, `toml`, `tsx`, `typescript`, `verilog`, `yaml`, `zig`
+
+Current parity-report summary:
+- `parseable=33`
+- `total=33`
+- `unsupported=0`
 
 **Backend types:**
 - **`dfa`** — lexer fully generated from grammar tables
 - **`dfa-partial`** — generated DFA with partial external-scanner coverage; runtime synthesizes remaining tokens
 - **`token_source`** — hand-written pure-Go lexer bridge
 
-**`degraded`** means the language parses and produces a tree, but some external-scanner tokens may be misclassified (`elixir`, `yaml`).
+**`degraded`** means the language parses and produces a tree, but the smoke parse still reports recoverable syntax errors (currently: `agda`, `c_sharp`, `elixir`, `haskell`, `swift`, `yaml`).
 
 ---
 
