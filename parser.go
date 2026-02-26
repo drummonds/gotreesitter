@@ -841,6 +841,43 @@ func isWhitespaceOnlySource(source []byte) bool {
 	return true
 }
 
+func extendNodeToTrailingWhitespace(n *Node, source []byte) {
+	if n == nil {
+		return
+	}
+	sourceEnd := uint32(len(source))
+	if n.endByte >= sourceEnd {
+		return
+	}
+	tail := source[n.endByte:sourceEnd]
+	for i := 0; i < len(tail); i++ {
+		switch tail[i] {
+		case ' ', '\t', '\n', '\r', '\f':
+		default:
+			return
+		}
+	}
+
+	pt := n.endPoint
+	for i := 0; i < len(tail); {
+		if tail[i] == '\n' {
+			pt.Row++
+			pt.Column = 0
+			i++
+			continue
+		}
+		_, size := utf8.DecodeRune(tail[i:])
+		if size <= 0 {
+			size = 1
+		}
+		i += size
+		pt.Column++
+	}
+
+	n.endByte = sourceEnd
+	n.endPoint = pt
+}
+
 // parseInternal is the core GLR parsing loop shared by Parse and
 // ParseWithTokenSource.
 //
@@ -1667,6 +1704,7 @@ func (p *Parser) buildResult(stack []stackEntry, source []byte, arena *nodeArena
 
 	if len(nodes) == 1 {
 		candidate := nodes[0]
+		extendNodeToTrailingWhitespace(candidate, source)
 		if !hasExpectedRoot || candidate.symbol == expectedRootSymbol {
 			return newTreeWithArenas(candidate, source, p.language, arena, borrowed)
 		}
@@ -1681,6 +1719,7 @@ func (p *Parser) buildResult(stack []stackEntry, source []byte, arena *nodeArena
 			rootChildren[0] = candidate
 		}
 		root := newParentNodeInArena(arena, expectedRootSymbol, true, rootChildren, nil, 0)
+		extendNodeToTrailingWhitespace(root, source)
 		return newTreeWithArenas(root, source, p.language, arena, borrowed)
 	}
 
@@ -1688,9 +1727,11 @@ func (p *Parser) buildResult(stack []stackEntry, source []byte, arena *nodeArena
 	// are extras (e.g. leading whitespace/comments). If so, fold the extras
 	// into the real root rather than wrapping everything in an error node.
 	var realRoot *Node
+	var allExtras []*Node
 	var extras []*Node
 	for _, n := range nodes {
 		if n.isExtra {
+			allExtras = append(allExtras, n)
 			// Ignore invisible extras in final-root recovery; they should not
 			// force an error wrapper or inflate root child counts.
 			if p != nil && p.language != nil && int(n.symbol) < len(p.language.SymbolMetadata) && p.language.SymbolMetadata[n.symbol].Visible {
@@ -1750,6 +1791,18 @@ func (p *Parser) buildResult(stack []stackEntry, source []byte, arena *nodeArena
 				}
 			}
 		}
+		// Invisible extras should still contribute to the root byte/point range.
+		for _, e := range allExtras {
+			if e.startByte < realRoot.startByte {
+				realRoot.startByte = e.startByte
+				realRoot.startPoint = e.startPoint
+			}
+			if e.endByte > realRoot.endByte {
+				realRoot.endByte = e.endByte
+				realRoot.endPoint = e.endPoint
+			}
+		}
+		extendNodeToTrailingWhitespace(realRoot, source)
 		if !hasExpectedRoot || realRoot.symbol == expectedRootSymbol {
 			return newTreeWithArenas(realRoot, source, p.language, arena, borrowed)
 		}
@@ -1762,6 +1815,7 @@ func (p *Parser) buildResult(stack []stackEntry, source []byte, arena *nodeArena
 	}
 	root := newParentNodeInArena(arena, rootSymbol, true, rootChildren, nil, 0)
 	root.hasError = true
+	extendNodeToTrailingWhitespace(root, source)
 	return newTreeWithArenas(root, source, p.language, arena, borrowed)
 }
 

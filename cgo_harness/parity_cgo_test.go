@@ -27,10 +27,8 @@ type parityMeta struct {
 }
 
 var paritySkips = map[string]parityMeta{
-	// Structural parity requires a Go implementation of the language's external
-	// scanner. Keep these skipped until scanners are ported.
-	"swift": {skipReason: "C reference parser language ABI version is 10 (reference binding expects 13-15)"},
-	"yaml":  {skipReason: "external scanner not ported"},
+	// Keep this map for explicitly known structural mismatches.
+	// Parse-support-specific skips (e.g. missing scanners) should not live here.
 }
 
 type parityCase struct {
@@ -236,12 +234,18 @@ func runParityCase(t *testing.T, tc parityCase, label string, src []byte) {
 	}
 	cLang, err := ParityCLanguage(tc.name)
 	if err != nil {
+		if skipReason := parityReferenceSkipReason(err); skipReason != "" {
+			t.Skipf("[%s/%s] skip C reference parser: %s", tc.name, label, skipReason)
+		}
 		t.Fatalf("[%s/%s] load C parser from languages.lock: %v", tc.name, label, err)
 	}
 
 	cParser := sitter.NewParser()
 	defer cParser.Close()
 	if err := cParser.SetLanguage(cLang); err != nil {
+		if skipReason := parityReferenceSkipReason(err); skipReason != "" {
+			t.Skipf("[%s/%s] skip C reference parser SetLanguage: %s", tc.name, label, skipReason)
+		}
 		t.Fatalf("[%s/%s] C parser SetLanguage error: %v", tc.name, label, err)
 	}
 	cTree := cParser.Parse(src, nil)
@@ -270,7 +274,21 @@ func runParityCase(t *testing.T, tc parityCase, label string, src []byte) {
 	t.Errorf("[%s/%s] %d node divergence(s):\n  %s", tc.name, label, len(errs), msg)
 }
 
-func normalizedSource(src string) []byte {
+func parityReferenceSkipReason(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "ABI version") || strings.Contains(msg, "Incompatible language version") {
+		return msg
+	}
+	return ""
+}
+
+func normalizedSource(name, src string) []byte {
+	if name == "yaml" || name == "swift" {
+		return []byte(src)
+	}
 	// Trim one trailing newline so both runtimes compare syntax tree shape
 	// independent of final-line extra-token representation.
 	return []byte(strings.TrimSuffix(src, "\n"))
@@ -401,7 +419,7 @@ func TestParityFreshParse(t *testing.T) {
 			if meta, ok := paritySkips[tc.name]; ok && meta.skipReason != "" {
 				t.Skipf("known mismatch: %s", meta.skipReason)
 			}
-			runParityCase(t, tc, "fresh", normalizedSource(tc.source))
+			runParityCase(t, tc, "fresh", normalizedSource(tc.name, tc.source))
 		})
 	}
 }
@@ -416,7 +434,7 @@ func TestParityIncrementalParse(t *testing.T) {
 				t.Skipf("known mismatch: %s", meta.skipReason)
 			}
 
-			src := normalizedSource(tc.source)
+			src := normalizedSource(tc.name, tc.source)
 			if len(src) < 2 {
 				t.Skip("source too short for incremental edit")
 			}
@@ -427,12 +445,18 @@ func TestParityIncrementalParse(t *testing.T) {
 			}
 			cLang, err := ParityCLanguage(tc.name)
 			if err != nil {
+				if skipReason := parityReferenceSkipReason(err); skipReason != "" {
+					t.Skipf("[%s/incremental] skip C reference parser: %s", tc.name, skipReason)
+				}
 				t.Fatalf("[%s/incremental] load C parser from languages.lock: %v", tc.name, err)
 			}
 
 			cParser := sitter.NewParser()
 			defer cParser.Close()
 			if err := cParser.SetLanguage(cLang); err != nil {
+				if skipReason := parityReferenceSkipReason(err); skipReason != "" {
+					t.Skipf("[%s/incremental] skip C parser SetLanguage: %s", tc.name, skipReason)
+				}
 				t.Fatalf("[%s/incremental] C parser SetLanguage error: %v", tc.name, err)
 			}
 
@@ -568,8 +592,23 @@ func TestParityHasNoErrors(t *testing.T) {
 			if meta, ok := paritySkips[tc.name]; ok && meta.skipReason != "" {
 				t.Skipf("known mismatch: %s", meta.skipReason)
 			}
+			cLang, err := ParityCLanguage(tc.name)
+			if err != nil {
+				if skipReason := parityReferenceSkipReason(err); skipReason != "" {
+					t.Skipf("[%s/errors] skip C reference parser: %s", tc.name, skipReason)
+				}
+				t.Fatalf("[%s/errors] load C parser from languages.lock: %v", tc.name, err)
+			}
+			cParser := sitter.NewParser()
+			defer cParser.Close()
+			if err := cParser.SetLanguage(cLang); err != nil {
+				if skipReason := parityReferenceSkipReason(err); skipReason != "" {
+					t.Skipf("[%s/errors] skip C parser SetLanguage: %s", tc.name, skipReason)
+				}
+				t.Fatalf("[%s/errors] C parser SetLanguage error: %v", tc.name, err)
+			}
 
-			tree, _, err := parseWithGo(tc, normalizedSource(tc.source), nil)
+			tree, _, err := parseWithGo(tc, normalizedSource(tc.name, tc.source), nil)
 			if err != nil {
 				t.Fatalf("[%s/errors] gotreesitter parse error: %v", tc.name, err)
 			}
