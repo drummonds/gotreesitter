@@ -833,7 +833,19 @@ func canReuseUnchangedTree(source []byte, oldTree *Tree, lang *Language) bool {
 	if oldTree == nil || oldTree.language != lang || len(oldTree.edits) != 0 {
 		return false
 	}
-	return bytes.Equal(oldTree.source, source)
+	oldSource := oldTree.source
+	if len(oldSource) != len(source) {
+		return false
+	}
+	if len(source) == 0 {
+		return true
+	}
+	// Common incremental no-edit case: caller passes the same source slice.
+	// Pointer equality avoids memcmp on hot no-op reparses.
+	if &oldSource[0] == &source[0] {
+		return true
+	}
+	return bytes.Equal(oldSource, source)
 }
 
 // dfaTokenSource wraps the built-in DFA Lexer as a TokenSource.
