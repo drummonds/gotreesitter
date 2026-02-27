@@ -130,6 +130,13 @@ func init() {
 		"vhdl":            VhdlExternalScanner{},
 	}
 
+	// Register scanners in the embedded loader's registry so that direct
+	// calls like JavascriptLanguage() (which bypass the registry) also
+	// get external scanners attached.
+	for name, s := range attachments {
+		RegisterExternalScanner(name, s)
+	}
+
 	for i := range registry {
 		if scanner, ok := attachments[registry[i].Name]; ok {
 			orig := registry[i].Language
