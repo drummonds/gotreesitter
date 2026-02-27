@@ -102,6 +102,10 @@ func newGLRStack(initial StateID) glrStack {
 }
 
 func newGLRStackWithScratch(initial StateID, scratch *glrEntryScratch) glrStack {
+	return newGLRStackWithScratchCap(initial, scratch, 256*1024)
+}
+
+func newGLRStackWithScratchCap(initial StateID, scratch *glrEntryScratch, maxInitialCap int) glrStack {
 	if scratch == nil {
 		return newGLRStack(initial)
 	}
@@ -110,7 +114,9 @@ func newGLRStackWithScratch(initial StateID, scratch *glrEntryScratch) glrStack 
 		// Reuse slab headroom for the primary stack to avoid repeated
 		// grow/copy churn on deep parses.
 		initialCap = len(scratch.slabs[0].data)
-		const maxInitialCap = 256 * 1024
+		if maxInitialCap <= 0 {
+			maxInitialCap = defaultStackEntrySlabCap
+		}
 		if initialCap > maxInitialCap {
 			initialCap = maxInitialCap
 		}

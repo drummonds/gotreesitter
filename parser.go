@@ -1597,7 +1597,14 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 
 	var stacksBuf [4]glrStack
 	stacks := stacksBuf[:1]
-	stacks[0] = newGLRStackWithScratch(p.language.InitialState, &scratch.entries)
+	initialStackCap := 256 * 1024
+	if reuse != nil {
+		// Incremental reparses often borrow scratch slabs from an earlier full
+		// parse. Preallocating that full retained capacity forces large memclr
+		// work on every edit; keep incremental stack preallocation modest.
+		initialStackCap = defaultStackEntrySlabCap
+	}
+	stacks[0] = newGLRStackWithScratchCap(p.language.InitialState, &scratch.entries, initialStackCap)
 	stacks[0].recoverabilityKnown = true
 	stacks[0].mayRecover = p.stateCanRecover(p.language.InitialState)
 	if timing != nil && timing.maxStacksSeen < len(stacks) {
