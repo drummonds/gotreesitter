@@ -219,10 +219,7 @@ func (p *Parser) tryReuseSubtree(s *glrStack, lookahead Token, ts TokenSource, i
 	// reuse surface without jumping to large ancestor nodes that can trigger
 	// expensive recovery behavior.
 	const maxNonLeafReuseSpan = 2048
-	bestIndex := -1
-	var bestState StateID
-	bestSpan := uint32(^uint32(0))
-	for i, n := range candidates {
+	for _, n := range candidates {
 		if n == nil || n.ChildCount() == 0 || n.parent == nil {
 			continue
 		}
@@ -234,14 +231,7 @@ func (p *Parser) tryReuseSubtree(s *glrStack, lookahead Token, ts TokenSource, i
 		if !ok {
 			continue
 		}
-		if bestIndex < 0 || span < bestSpan {
-			bestIndex = i
-			bestSpan = span
-			bestState = nextState
-		}
-	}
-	if bestIndex >= 0 {
-		return reuseNode(p, s, candidates[bestIndex], bestState, lookahead, ts, idx, entryScratch, gssScratch)
+		return reuseNode(p, s, n, nextState, lookahead, ts, idx, entryScratch, gssScratch)
 	}
 
 	return lookahead, 0, false

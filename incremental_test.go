@@ -325,7 +325,7 @@ func TestParseIncrementalReleaseKeepsBorrowedNodesAlive(t *testing.T) {
 	}
 }
 
-func TestTryReuseSubtreePrefersSmallestNonLeafCandidate(t *testing.T) {
+func TestTryReuseSubtreeReusesFirstEligibleNonLeafCandidate(t *testing.T) {
 	lang := buildArithmeticLanguage()
 	parser := NewParser(lang)
 	oldSource := []byte("1+2+3+4")
@@ -352,7 +352,8 @@ func TestTryReuseSubtreePrefersSmallestNonLeafCandidate(t *testing.T) {
 	}
 	candidates := reuse.candidates(lookahead.StartByte)
 	var expected *Node
-	expectedSpan := ^uint32(0)
+	var expectedState StateID
+	var expectedSpan uint32
 	for _, n := range candidates {
 		if n == nil || n.ChildCount() == 0 || n.Parent() == nil {
 			continue
@@ -364,10 +365,10 @@ func TestTryReuseSubtreePrefersSmallestNonLeafCandidate(t *testing.T) {
 		if _, ok := parser.reuseTargetState(stack.top().state, n, lookahead); !ok {
 			continue
 		}
-		if expected == nil || span < expectedSpan {
-			expected = n
-			expectedSpan = span
-		}
+		expected = n
+		expectedState, _ = parser.reuseTargetState(stack.top().state, n, lookahead)
+		expectedSpan = span
+		break
 	}
 	if expected == nil {
 		t.Fatal("expected at least one eligible non-leaf reuse candidate")
@@ -385,6 +386,9 @@ func TestTryReuseSubtreePrefersSmallestNonLeafCandidate(t *testing.T) {
 	}
 	if stack.top().node != expected {
 		t.Fatalf("reused wrong non-leaf candidate: got span=%d want span=%d", stack.top().node.EndByte()-stack.top().node.StartByte(), expectedSpan)
+	}
+	if stack.top().state != expectedState {
+		t.Fatalf("stack top state = %d, want %d", stack.top().state, expectedState)
 	}
 	if reusedBytes != expectedSpan {
 		t.Fatalf("reusedBytes = %d, want %d", reusedBytes, expectedSpan)
