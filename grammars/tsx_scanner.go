@@ -8,25 +8,25 @@ import (
 
 // External token indexes for the tsx grammar.
 const (
-	tsxTokAutoSemicolon     = 0
-	tsxTokTemplateChars     = 1
-	tsxTokTernaryQmark      = 2
-	tsxTokHtmlComment       = 3
-	tsxTokLogicalOr         = 4
-	tsxTokEscapeSequence    = 5
-	tsxTokRegexPattern      = 6
-	tsxTokJsxText           = 7
-	tsxTokFuncSigAutoSemi   = 8
-	tsxTokErrorRecovery     = 9
+	tsxTokAutoSemicolon   = 0
+	tsxTokTemplateChars   = 1
+	tsxTokTernaryQmark    = 2
+	tsxTokHtmlComment     = 3
+	tsxTokLogicalOr       = 4
+	tsxTokEscapeSequence  = 5
+	tsxTokRegexPattern    = 6
+	tsxTokJsxText         = 7
+	tsxTokFuncSigAutoSemi = 8
+	tsxTokErrorRecovery   = 9
 )
 
 const (
-	tsxSymAutoSemicolon     gotreesitter.Symbol = 165
-	tsxSymTemplateChars     gotreesitter.Symbol = 166
-	tsxSymTernaryQmark      gotreesitter.Symbol = 167
-	tsxSymHtmlComment       gotreesitter.Symbol = 168
-	tsxSymJsxText           gotreesitter.Symbol = 169
-	tsxSymFuncSigAutoSemi   gotreesitter.Symbol = 170
+	tsxSymAutoSemicolon   gotreesitter.Symbol = 165
+	tsxSymTemplateChars   gotreesitter.Symbol = 166
+	tsxSymTernaryQmark    gotreesitter.Symbol = 167
+	tsxSymHtmlComment     gotreesitter.Symbol = 168
+	tsxSymJsxText         gotreesitter.Symbol = 169
+	tsxSymFuncSigAutoSemi gotreesitter.Symbol = 170
 )
 
 // TsxExternalScanner handles automatic semicolons, template strings,
@@ -109,15 +109,8 @@ func tsxScanAutoSemicolon(lexer *gotreesitter.ExternalLexer, validSymbols []bool
 			return true
 		}
 		if ch == '}' {
-			for {
-				lexer.Advance(true)
-				if !unicode.IsSpace(lexer.Lookahead()) {
-					break
-				}
-			}
-			if lexer.Lookahead() == ':' {
-				return tsxValid(validSymbols, tsxTokLogicalOr)
-			}
+			// Do not consume `}` while producing ASI; swallowing it truncates
+			// surrounding blocks and can force premature error-accept paths.
 			return true
 		}
 		if !unicode.IsSpace(ch) {
