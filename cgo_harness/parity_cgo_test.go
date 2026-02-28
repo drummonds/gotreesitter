@@ -300,12 +300,8 @@ func runParityCase(t *testing.T, tc parityCase, label string, src []byte) {
 		msg += fmt.Sprintf("\n  ... and %d more", extra)
 	}
 	goSummary := fmt.Sprintf(
-		"go_root type=%q end=%d/%d hasError=%v truncated=%v stopReason=%s tokenEOFEarly=%v tokens=%d lastTokenEnd=%d expectedEOF=%d lastTokenSymbol=%d lastTokenEOF=%v iterations=%d/%d nodes=%d/%d peakDepth=%d/%d maxStacks=%d",
-		goRoot.Type(goLang), goRoot.EndByte(), len(src), goRoot.HasError(), goRuntime.Truncated,
-		goRuntime.StopReason, goRuntime.TokenSourceEOFEarly, goRuntime.TokensConsumed,
-		goRuntime.LastTokenEndByte, goRuntime.ExpectedEOFByte, goRuntime.LastTokenSymbol, goRuntime.LastTokenWasEOF,
-		goRuntime.Iterations, goRuntime.IterationLimit, goRuntime.NodesAllocated, goRuntime.NodeLimit,
-		goRuntime.PeakStackDepth, goRuntime.StackDepthLimit, goRuntime.MaxStacksSeen,
+		"go_root type=%q end=%d/%d hasError=%v %s",
+		goRoot.Type(goLang), goRoot.EndByte(), len(src), goRoot.HasError(), goRuntime.Summary(),
 	)
 	cSummary := fmt.Sprintf(
 		"c_root type=%q end=%d/%d hasError=%v",

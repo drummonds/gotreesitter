@@ -1,6 +1,7 @@
 package gotreesitter
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -67,6 +68,21 @@ type ParseRuntime struct {
 	NodesAllocated      int
 	PeakStackDepth      int
 	MaxStacksSeen       int
+}
+
+// Summary returns a stable one-line diagnostic string for parse-runtime stats.
+func (rt ParseRuntime) Summary() string {
+	stopReason := rt.StopReason
+	if stopReason == "" {
+		stopReason = ParseStopNone
+	}
+	return fmt.Sprintf(
+		"truncated=%v stopReason=%s tokenEOFEarly=%v tokens=%d lastTokenEnd=%d expectedEOF=%d lastTokenSymbol=%d lastTokenEOF=%v iterations=%d/%d nodes=%d/%d peakDepth=%d/%d maxStacks=%d",
+		rt.Truncated, stopReason, rt.TokenSourceEOFEarly, rt.TokensConsumed,
+		rt.LastTokenEndByte, rt.ExpectedEOFByte, rt.LastTokenSymbol, rt.LastTokenWasEOF,
+		rt.Iterations, rt.IterationLimit, rt.NodesAllocated, rt.NodeLimit,
+		rt.PeakStackDepth, rt.StackDepthLimit, rt.MaxStacksSeen,
+	)
 }
 
 // Symbol returns the node's grammar symbol.

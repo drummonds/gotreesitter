@@ -139,12 +139,8 @@ func requireCompleteParse(tb testing.TB, tree *gotreesitter.Tree, src []byte, la
 	}
 	if got, want := root.EndByte(), uint32(len(src)); got != want {
 		rt := tree.ParseRuntime()
-		tb.Fatalf(
-			"%s parse truncated: root.EndByte=%d want=%d type=%q hasError=%v truncated=%v stopReason=%s tokenEOFEarly=%v tokens=%d lastTokenEnd=%d expectedEOF=%d lastTokenSymbol=%d lastTokenEOF=%v iterations=%d/%d nodes=%d/%d peakDepth=%d/%d maxStacks=%d",
-			phase, got, want, root.Type(lang), root.HasError(),
-			rt.Truncated, rt.StopReason, rt.TokenSourceEOFEarly, rt.TokensConsumed, rt.LastTokenEndByte, rt.ExpectedEOFByte, rt.LastTokenSymbol, rt.LastTokenWasEOF,
-			rt.Iterations, rt.IterationLimit, rt.NodesAllocated, rt.NodeLimit, rt.PeakStackDepth, rt.StackDepthLimit, rt.MaxStacksSeen,
-		)
+		tb.Fatalf("%s parse truncated: root.EndByte=%d want=%d type=%q hasError=%v %s",
+			phase, got, want, root.Type(lang), root.HasError(), rt.Summary())
 	}
 	return root
 }
