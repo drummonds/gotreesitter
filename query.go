@@ -1353,6 +1353,21 @@ func (q *Query) CaptureNames() []string {
 	return q.captures
 }
 
+// SetValues returns the values of a #set! directive with the given key
+// for a match's pattern, or nil if not present. This is used by
+// InjectionParser to read injection.language metadata.
+func (m QueryMatch) SetValues(q *Query, key string) []string {
+	if q == nil || m.PatternIndex < 0 || m.PatternIndex >= len(q.patterns) {
+		return nil
+	}
+	for _, pred := range q.patterns[m.PatternIndex].predicates {
+		if pred.kind == predicateSet && pred.literal == key {
+			return pred.values
+		}
+	}
+	return nil
+}
+
 // --------------------------------------------------------------------------
 // S-expression parser
 // --------------------------------------------------------------------------
