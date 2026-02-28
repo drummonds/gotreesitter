@@ -2010,11 +2010,7 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 				}
 				if reuse != nil {
 					act := actions[0]
-					if act.Type == ParseActionReduce {
-						p.applyActionWithReduceChain(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-					} else {
-						p.applyAction(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-					}
+					p.applyAction(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
 					continue
 				}
 				if perfCountersEnabled {
@@ -2026,11 +2022,7 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 				const maxForkCloneDepth = 4 * 1024
 				if s.depth() > maxForkCloneDepth {
 					act := actions[0]
-					if act.Type == ParseActionReduce {
-						p.applyActionWithReduceChain(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-					} else {
-						p.applyAction(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-					}
+					p.applyAction(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
 					continue
 				}
 				// Copy the current stack value before appending forks.
@@ -2039,21 +2031,13 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 				for ai := 1; ai < len(actions); ai++ {
 					fork := base.cloneWithScratch(&scratch.gss)
 					act := actions[ai]
-					if act.Type == ParseActionReduce {
-						p.applyActionWithReduceChain(&fork, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-					} else {
-						p.applyAction(&fork, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-					}
+					p.applyAction(&fork, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
 					stacks = append(stacks, fork)
 				}
 				// Re-acquire the pointer after possible reallocation.
 				s = &stacks[si]
 				act := actions[0]
-				if act.Type == ParseActionReduce {
-					p.applyActionWithReduceChain(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-				} else {
-					p.applyAction(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
-				}
+				p.applyAction(s, act, tok, &anyReduced, &nodeCount, arena, &scratch.entries, &scratch.gss, &scratch.tmpEntries)
 			} else {
 				act := actions[0]
 				if act.Type == ParseActionReduce {
