@@ -278,9 +278,12 @@ func runParityCase(t *testing.T, tc parityCase, label string, src []byte) {
 		t.Fatalf("[%s/%s] C reference parser returned nil tree", tc.name, label)
 	}
 	defer cTree.Close()
+	goRoot := goTree.RootNode()
+	cRoot := cTree.RootNode()
+	goRuntime := goTree.ParseRuntime()
 
 	var errs []string
-	compareNodes(goTree.RootNode(), goLang, cTree.RootNode(), "root", &errs)
+	compareNodes(goRoot, goLang, cRoot, "root", &errs)
 	if len(errs) == 0 {
 		return
 	}
@@ -296,7 +299,19 @@ func runParityCase(t *testing.T, tc parityCase, label string, src []byte) {
 	if extra > 0 {
 		msg += fmt.Sprintf("\n  ... and %d more", extra)
 	}
-	t.Errorf("[%s/%s] %d node divergence(s):\n  %s", tc.name, label, len(errs), msg)
+	goSummary := fmt.Sprintf(
+		"go_root type=%q end=%d/%d hasError=%v truncated=%v stopReason=%s tokenEOFEarly=%v tokens=%d lastTokenEnd=%d expectedEOF=%d lastTokenSymbol=%d lastTokenEOF=%v iterations=%d/%d nodes=%d/%d peakDepth=%d/%d maxStacks=%d",
+		goRoot.Type(goLang), goRoot.EndByte(), len(src), goRoot.HasError(), goRuntime.Truncated,
+		goRuntime.StopReason, goRuntime.TokenSourceEOFEarly, goRuntime.TokensConsumed,
+		goRuntime.LastTokenEndByte, goRuntime.ExpectedEOFByte, goRuntime.LastTokenSymbol, goRuntime.LastTokenWasEOF,
+		goRuntime.Iterations, goRuntime.IterationLimit, goRuntime.NodesAllocated, goRuntime.NodeLimit,
+		goRuntime.PeakStackDepth, goRuntime.StackDepthLimit, goRuntime.MaxStacksSeen,
+	)
+	cSummary := fmt.Sprintf(
+		"c_root type=%q end=%d/%d hasError=%v",
+		cRoot.Kind(), cRoot.EndByte(), len(src), cRoot.HasError(),
+	)
+	t.Errorf("[%s/%s] %d node divergence(s):\n  %s\n  %s\n  %s", tc.name, label, len(errs), msg, goSummary, cSummary)
 }
 
 func parityReferenceSkipReason(err error) string {

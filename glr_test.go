@@ -346,6 +346,101 @@ func TestGLRForkPrunesErroringAlternative(t *testing.T) {
 	}
 }
 
+// TestMergeKeyGroupsEquivalentStacks proves stackEquivalent(a,b)==true
+// implies mergeKeyForStack(a)==mergeKeyForStack(b). With coarse merge keys,
+// this ensures equivalent stacks are always deduped in the same bucket.
+func TestMergeKeyGroupsEquivalentStacks(t *testing.T) {
+	scratch := &gssScratch{}
+
+	// Helper to build a GSS-backed stack with known entries.
+	buildStack := func(entries []stackEntry) glrStack {
+		var s glrStack
+		s.gss = buildGSSStack(entries, scratch)
+		s.byteOffset = stackByteOffset(entries)
+		return s
+	}
+
+	// Case 1: identical entries → equivalent, same hash.
+	node1a := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, isNamed: true}
+	node1b := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, isNamed: true}
+	a := buildStack([]stackEntry{{state: 1}, {state: 2, node: node1a}})
+	b := buildStack([]stackEntry{{state: 1}, {state: 2, node: node1b}})
+
+	if !stackEquivalent(a, b) {
+		t.Fatal("case 1: expected equivalent stacks")
+	}
+	ka := mergeKeyForStack(a)
+	kb := mergeKeyForStack(b)
+	if ka != kb {
+		t.Fatalf("case 1: equivalent stacks have different merge keys: %+v vs %+v", ka, kb)
+	}
+
+	// Case 2: different symbol → not equivalent.
+	node2a := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1}
+	node2b := &Node{symbol: 11, startByte: 0, endByte: 5, parseState: 1}
+	c := buildStack([]stackEntry{{state: 1}, {state: 2, node: node2a}})
+	d := buildStack([]stackEntry{{state: 1}, {state: 2, node: node2b}})
+	if stackEquivalent(c, d) {
+		t.Fatal("case 2: expected non-equivalent stacks")
+	}
+	kc := mergeKeyForStack(c)
+	kd := mergeKeyForStack(d)
+	if kc == kd {
+		t.Log("case 2: non-equivalent stacks share coarse merge key (expected collision)")
+	}
+
+	// Case 3: isMissing differs → not equivalent (hash includes isMissing).
+	node3a := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1}
+	node3b := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, isMissing: true}
+	e := buildStack([]stackEntry{{state: 1}, {state: 2, node: node3a}})
+	f := buildStack([]stackEntry{{state: 1}, {state: 2, node: node3b}})
+	if stackEquivalent(e, f) {
+		t.Fatal("case 3: isMissing differs, stacks should not be equivalent")
+	}
+
+	// Case 4: nil nodes on both sides → equivalent, same hash.
+	g := buildStack([]stackEntry{{state: 1}, {state: 2}})
+	h := buildStack([]stackEntry{{state: 1}, {state: 2}})
+	if !stackEquivalent(g, h) {
+		t.Fatal("case 4: expected equivalent nil-node stacks")
+	}
+	kg := mergeKeyForStack(g)
+	kh := mergeKeyForStack(h)
+	if kg != kh {
+		t.Fatalf("case 4: equivalent nil-node stacks have different merge keys: %+v vs %+v", kg, kh)
+	}
+
+	// Case 5: with children — same children → equivalent.
+	child1 := &Node{symbol: 20, startByte: 0, endByte: 3}
+	child2 := &Node{symbol: 20, startByte: 0, endByte: 3}
+	node5a := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, children: []*Node{child1}}
+	node5b := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, children: []*Node{child2}}
+	i := buildStack([]stackEntry{{state: 1}, {state: 2, node: node5a}})
+	j := buildStack([]stackEntry{{state: 1}, {state: 2, node: node5b}})
+	if !stackEquivalent(i, j) {
+		t.Fatal("case 5: expected equivalent stacks with same children")
+	}
+	ki := mergeKeyForStack(i)
+	kj := mergeKeyForStack(j)
+	if ki != kj {
+		t.Fatalf("case 5: equivalent stacks with children have different merge keys: %+v vs %+v", ki, kj)
+	}
+
+	// Case 6: children differ in symbol → not equivalent (children check).
+	// Coarse key may collide; stackEquivalent must reject the mismatch.
+	child3 := &Node{symbol: 20, startByte: 0, endByte: 3}
+	child4 := &Node{symbol: 21, startByte: 0, endByte: 3}
+	node6a := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, children: []*Node{child3}}
+	node6b := &Node{symbol: 10, startByte: 0, endByte: 5, parseState: 1, children: []*Node{child4}}
+	k := buildStack([]stackEntry{{state: 1}, {state: 2, node: node6a}})
+	l := buildStack([]stackEntry{{state: 1}, {state: 2, node: node6b}})
+	if stackEquivalent(k, l) {
+		t.Fatal("case 6: expected non-equivalent stacks with different children")
+	}
+	// These may share the same coarse merge key; that's fine because
+	// stackEquivalent still rejects them.
+}
+
 func TestMergeStacksAllDeadReturnsEmpty(t *testing.T) {
 	s1 := newGLRStack(StateID(1))
 	s2 := newGLRStack(StateID(2))

@@ -47,8 +47,7 @@ const (
 	// Hard cap on concurrently retained GLR stacks in parseInternal.
 	maxGLRStacks = 64
 	// Tree-sitter's C runtime caps links per stack node at 8.
-	// We cap distinct alternatives per merge key similarly to avoid
-	// unbounded stack growth while preserving multiple paths.
+	// Keep the same cap to avoid turning per-key pruning into global-cap churn.
 	maxStacksPerMergeKey = 8
 )
 
@@ -66,6 +65,7 @@ type glrMergeKey struct {
 type glrMergeSlot struct {
 	key        glrMergeKey
 	indices    [maxStacksPerMergeKey]int
+	hashes     [maxStacksPerMergeKey]uint64
 	count      int
 	worstIndex int
 }
@@ -302,6 +302,25 @@ func mergeKeyForStack(s glrStack) glrMergeKey {
 	}
 }
 
+func stackHash(s glrStack) uint64 {
+	if s.gss.head != nil {
+		return s.gss.head.hash
+	}
+	if len(s.entries) == 0 {
+		if perfCountersEnabled {
+			perfRecordMergeHashZero()
+		}
+		return 0
+	}
+	// Entries-only stack (pre-fork primary). Compute the same rolling hash
+	// GSS nodes use so per-bucket hash prefiltering works before GSS materializes.
+	h := gssHashSeed
+	for i := range s.entries {
+		h = gssEntryHash(h, s.entries[i])
+	}
+	return h
+}
+
 func stackEntriesEqual(a, b []stackEntry) bool {
 	if len(a) != len(b) {
 		return false
@@ -408,6 +427,7 @@ func stackEntryNodesEquivalent(a, b *Node) bool {
 		a.endByte != b.endByte ||
 		a.isExtra != b.isExtra ||
 		a.isNamed != b.isNamed ||
+		a.isMissing != b.isMissing ||
 		a.hasError != b.hasError ||
 		a.parseState != b.parseState ||
 		a.productionID != b.productionID ||
@@ -484,6 +504,16 @@ func stackCompare(a, b glrStack) int {
 	return 0
 }
 
+func preferOverflowCandidate(candidate, incumbent glrStack, candidateHash, incumbentHash uint64) bool {
+	cmp := stackCompare(candidate, incumbent)
+	if cmp != 0 {
+		return cmp > 0
+	}
+	// Equal-ranked candidates should not depend on insertion order.
+	// Deterministically keep the higher hash to preserve diversity.
+	return candidateHash > incumbentHash
+}
+
 func mergeStacksWithScratch(stacks []glrStack, scratch *glrMergeScratch) []glrStack {
 	if len(stacks) == 0 {
 		return stacks
@@ -526,6 +556,7 @@ func mergeStacksWithScratch(stacks []glrStack, scratch *glrMergeScratch) []glrSt
 	slotCount := 0
 	for i := range alive {
 		stack := alive[i]
+		hash := stackHash(stack)
 		key := mergeKeyForStack(stack)
 
 		slotIndex := -1
@@ -545,7 +576,12 @@ func mergeStacksWithScratch(stacks []glrStack, scratch *glrMergeScratch) []glrSt
 		slot := &slots[slotIndex]
 
 		duplicateIndex := -1
+		compared := false
 		for j := 0; j < slot.count; j++ {
+			if slot.hashes[j] != hash {
+				continue
+			}
+			compared = true
 			idx := slot.indices[j]
 			existing := &result[idx]
 			if stackEquivalent(*existing, stack) {
@@ -553,9 +589,18 @@ func mergeStacksWithScratch(stacks []glrStack, scratch *glrMergeScratch) []glrSt
 				break
 			}
 		}
+		if !compared && slot.count > 0 && perfCountersEnabled {
+			perfRecordStackEquivalentHashMissSkip()
+		}
 		if duplicateIndex >= 0 {
 			if stackCompare(stack, result[duplicateIndex]) > 0 {
 				result[duplicateIndex] = stack
+				for j := 0; j < slot.count; j++ {
+					if slot.indices[j] == duplicateIndex {
+						slot.hashes[j] = hash
+						break
+					}
+				}
 				if slot.worstIndex == duplicateIndex {
 					slot.worstIndex = recomputeMergeSlotWorst(slot, result)
 				}
@@ -567,6 +612,7 @@ func mergeStacksWithScratch(stacks []glrStack, scratch *glrMergeScratch) []glrSt
 			idx := len(result)
 			result = append(result, stack)
 			slot.indices[slot.count] = idx
+			slot.hashes[slot.count] = hash
 			slot.count++
 			if slot.worstIndex < 0 || stackCompare(result[idx], result[slot.worstIndex]) < 0 {
 				slot.worstIndex = idx
@@ -579,13 +625,33 @@ func mergeStacksWithScratch(stacks []glrStack, scratch *glrMergeScratch) []glrSt
 
 		// Per-key alternative budget reached: replace the weakest
 		// retained candidate only if this stack is better.
-		if slot.worstIndex >= 0 && stackCompare(stack, result[slot.worstIndex]) > 0 {
+		if slot.worstIndex >= 0 {
+			replacedSlot := -1
+			for j := 0; j < slot.count; j++ {
+				if slot.indices[j] == slot.worstIndex {
+					replacedSlot = j
+					break
+				}
+			}
+			incumbentHash := uint64(0)
+			if replacedSlot >= 0 {
+				incumbentHash = slot.hashes[replacedSlot]
+			}
+			if !preferOverflowCandidate(stack, result[slot.worstIndex], hash, incumbentHash) {
+				continue
+			}
 			if perfCountersEnabled {
 				perfRecordMergeReplacement()
 			}
 			result[slot.worstIndex] = stack
+			if replacedSlot >= 0 {
+				slot.hashes[replacedSlot] = hash
+			}
 			slot.worstIndex = recomputeMergeSlotWorst(slot, result)
 		}
+	}
+	if perfCountersEnabled {
+		perfRecordMergeOut(len(result))
 	}
 	scratch.result = result
 	scratch.slots = slots[:slotCount]

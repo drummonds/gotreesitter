@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +59,26 @@ var parserScratchPool = sync.Pool{
 	New: func() any {
 		return &parserScratch{}
 	},
+}
+
+var (
+	parseNodeLimitScaleOnce sync.Once
+	parseNodeLimitScale     int
+)
+
+func parseNodeLimitScaleFactor() int {
+	parseNodeLimitScaleOnce.Do(func() {
+		parseNodeLimitScale = 1
+		raw := strings.TrimSpace(os.Getenv("GOT_PARSE_NODE_LIMIT_SCALE"))
+		if raw == "" {
+			return
+		}
+		n, err := strconv.Atoi(raw)
+		if err == nil && n > 0 {
+			parseNodeLimitScale = n
+		}
+	})
+	return parseNodeLimitScale
 }
 
 // IncrementalParseProfile attributes incremental parse time into coarse buckets.
@@ -1393,7 +1416,16 @@ func parseStackDepth(sourceLen int) int {
 // parseNodeLimit returns the maximum number of Node allocations allowed.
 // This is the hard ceiling that prevents OOM regardless of iteration count.
 func parseNodeLimit(sourceLen int) int {
-	return max(50_000, sourceLen*10)
+	limit := max(100_000, sourceLen*10)
+	scale := parseNodeLimitScaleFactor()
+	if scale <= 1 {
+		return limit
+	}
+	maxInt := int(^uint(0) >> 1)
+	if limit > maxInt/scale {
+		return maxInt
+	}
+	return limit * scale
 }
 
 func parseFullArenaNodeCapacity(sourceLen, hint int) int {
@@ -1626,9 +1658,56 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 		scratch.entries.ensureInitialCap(parseIncrementalEntryScratchCapacity(len(source)))
 	}
 	var reuseState parseReuseState
-
-	finalize := func(stacks []glrStack) *Tree {
-		return p.buildResultFromGLR(stacks, source, arena, oldTree, &reuseState)
+	nodeCount := 0
+	iterationsUsed := 0
+	peakStackDepth := 0
+	maxStacksSeen := 0
+	var perfTokensConsumed uint64
+	var lastTokenEndByte uint32
+	var lastTokenSymbol Symbol
+	var lastTokenWasEOF bool
+	tokenSourceEOFEarly := false
+	expectedEOFByte := uint32(len(source))
+	if len(p.included) > 0 {
+		expectedEOFByte = p.included[len(p.included)-1].EndByte
+	}
+	parseRuntime := ParseRuntime{
+		StopReason:      ParseStopNone,
+		SourceLen:       uint32(len(source)),
+		ExpectedEOFByte: expectedEOFByte,
+	}
+	finalizeTree := func(tree *Tree, stopReason ParseStopReason) *Tree {
+		if tokenSourceEOFEarly && (stopReason == ParseStopAccepted || stopReason == ParseStopNone) {
+			stopReason = ParseStopTokenSourceEOF
+		}
+		parseRuntime.StopReason = stopReason
+		parseRuntime.Iterations = iterationsUsed
+		parseRuntime.NodesAllocated = nodeCount
+		parseRuntime.PeakStackDepth = peakStackDepth
+		parseRuntime.MaxStacksSeen = maxStacksSeen
+		parseRuntime.TokensConsumed = perfTokensConsumed
+		parseRuntime.LastTokenEndByte = lastTokenEndByte
+		parseRuntime.LastTokenSymbol = lastTokenSymbol
+		parseRuntime.LastTokenWasEOF = lastTokenWasEOF
+		parseRuntime.TokenSourceEOFEarly = tokenSourceEOFEarly
+		parseRuntime.RootEndByte = 0
+		parseRuntime.Truncated = false
+		if tree != nil && tree.RootNode() != nil {
+			parseRuntime.RootEndByte = tree.RootNode().EndByte()
+			parseRuntime.Truncated = parseRuntime.RootEndByte < expectedEOFByte
+		}
+		if tree != nil {
+			tree.setParseRuntime(parseRuntime)
+		}
+		return tree
+	}
+	finalize := func(stacks []glrStack, stopReason ParseStopReason) *Tree {
+		tree := p.buildResultFromGLR(stacks, source, arena, oldTree, &reuseState)
+		return finalizeTree(tree, stopReason)
+	}
+	finalizeErrorTree := func(stopReason ParseStopReason) *Tree {
+		arena.Release()
+		return finalizeTree(parseErrorTree(source, p.language), stopReason)
 	}
 
 	var stacksBuf [4]glrStack
@@ -1643,6 +1722,7 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 	stacks[0] = newGLRStackWithScratchCap(p.language.InitialState, &scratch.entries, initialStackCap)
 	stacks[0].recoverabilityKnown = true
 	stacks[0].mayRecover = p.stateCanRecover(p.language.InitialState)
+	maxStacksSeen = len(stacks)
 	if timing != nil && timing.maxStacksSeen < len(stacks) {
 		timing.maxStacksSeen = len(stacks)
 	}
@@ -1659,41 +1739,47 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 	maxIter := parseIterations(len(source))
 	maxDepth := parseStackDepth(len(source))
 	maxNodes := parseNodeLimit(len(source))
-	nodeCount := 0
+	parseRuntime.IterationLimit = maxIter
+	parseRuntime.StackDepthLimit = maxDepth
+	parseRuntime.NodeLimit = maxNodes
 
 	needToken := true
 	var tok Token
-	var perfTokensConsumed uint64
 
 	// Per-primary-stack infinite-reduce detection.
 	var lastReduceState StateID
 	var consecutiveReduces int
 
 	for iter := 0; iter < maxIter; iter++ {
+		iterationsUsed = iter + 1
 		if perfCountersEnabled {
 			perfRecordMaxConcurrentStacks(len(stacks))
 		}
 		if timing != nil && len(stacks) > timing.maxStacksSeen {
 			timing.maxStacksSeen = len(stacks)
 		}
+		if len(stacks) > maxStacksSeen {
+			maxStacksSeen = len(stacks)
+		}
 		// Fast-path the overwhelmingly common non-GLR case with one live stack.
 		if len(stacks) == 1 {
 			if stacks[0].dead {
-				arena.Release()
-				return parseErrorTree(source, p.language)
+				return finalizeErrorTree(ParseStopNoStacksAlive)
 			}
 		} else {
 			// Prune dead stacks and collapse only truly duplicate stack versions.
 			stacks = mergeStacksWithScratch(stacks, &scratch.merge)
 			if len(stacks) == 0 {
-				arena.Release()
-				return parseErrorTree(source, p.language)
+				return finalizeErrorTree(ParseStopNoStacksAlive)
 			}
 		}
 		// Cap the number of parallel stacks to prevent combinatorial explosion.
 		// Keep the most promising stacks instead of truncating by insertion
 		// order, which can discard viable parses on highly-ambiguous inputs.
 		if len(stacks) > maxStacks {
+			if perfCountersEnabled {
+				perfRecordGlobalCapCull(len(stacks), maxStacks)
+			}
 			sort.SliceStable(stacks, func(i, j int) bool {
 				return stackCompare(stacks[i], stacks[j]) > 0
 			})
@@ -1715,8 +1801,15 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 
 		// Safety: if the primary stack has grown beyond the depth cap,
 		// or we've allocated too many nodes, return what we have.
-		if stacks[0].depth() > maxDepth || nodeCount > maxNodes {
-			return finalize(stacks)
+		primaryDepth := stacks[0].depth()
+		if primaryDepth > peakStackDepth {
+			peakStackDepth = primaryDepth
+		}
+		if primaryDepth > maxDepth {
+			return finalize(stacks, ParseStopStackDepthLimit)
+		}
+		if nodeCount > maxNodes {
+			return finalize(stacks, ParseStopNodeLimit)
 		}
 
 		// Use the primary (first) stack's state for DFA lex mode selection.
@@ -1746,8 +1839,12 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 
 		if needToken {
 			tok = ts.Next()
-			if perfCountersEnabled {
-				perfTokensConsumed++
+			perfTokensConsumed++
+			lastTokenEndByte = tok.EndByte
+			lastTokenSymbol = tok.Symbol
+			lastTokenWasEOF = tok.Symbol == 0 && tok.StartByte == tok.EndByte
+			if lastTokenWasEOF && tok.EndByte < expectedEOFByte {
+				tokenSourceEOFEarly = true
 			}
 			// Clear per-stack shifted flags so all stacks process the
 			// new token.
@@ -1823,7 +1920,7 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 					if tok.StartByte == tok.EndByte {
 						// True EOF. If this is the only stack, return result.
 						if len(stacks) == 1 {
-							return finalize(stacks)
+							return finalize(stacks, ParseStopAccepted)
 						}
 						// Multiple stacks at EOF: this one is done.
 						// Mark dead so merge picks the best remaining.
@@ -1856,7 +1953,7 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 
 				// Only stack: error recovery — wrap token in error node.
 				if s.depth() == 0 {
-					return finalize(stacks)
+					return finalize(stacks, ParseStopNoStacksAlive)
 				}
 				errNode := newLeafNodeInArena(arena, errorSymbol, false,
 					tok.StartByte, tok.EndByte, tok.StartPoint, tok.EndPoint)
@@ -1932,13 +2029,13 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 		// Check for accept on any stack.
 		for si := range stacks {
 			if stacks[si].accepted {
-				return finalize(stacks[si : si+1])
+				return finalize(stacks[si:si+1], ParseStopAccepted)
 			}
 		}
 	}
 
 	// Iteration limit reached.
-	return finalize(stacks)
+	return finalize(stacks, ParseStopIterationLimit)
 }
 
 func appendUniqueArenaRef(refs []*nodeArena, arenaRef, exclude *nodeArena) []*nodeArena {

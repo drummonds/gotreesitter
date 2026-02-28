@@ -1263,3 +1263,71 @@ func TestParserIncrementalArithmeticEditThenUndoMatchesFreshParse(t *testing.T) 
 		t.Fatalf("incremental undo SExpr mismatch:\n  got:  %s\n  want: %s", got, want)
 	}
 }
+
+func TestParseRuntimeReportsAcceptedOnCompleteParse(t *testing.T) {
+	lang := buildArithmeticLanguage()
+	parser := NewParser(lang)
+
+	tree := mustParse(t, parser, []byte("1+2"))
+	rt := tree.ParseRuntime()
+
+	if rt.StopReason != ParseStopAccepted {
+		t.Fatalf("StopReason = %q, want %q", rt.StopReason, ParseStopAccepted)
+	}
+	if tree.ParseStoppedEarly() {
+		t.Fatal("ParseStoppedEarly() = true, want false")
+	}
+	if rt.TokenSourceEOFEarly {
+		t.Fatal("TokenSourceEOFEarly = true, want false")
+	}
+	if rt.Truncated {
+		t.Fatal("Truncated = true, want false")
+	}
+	if rt.IterationLimit <= 0 {
+		t.Fatalf("IterationLimit = %d, want > 0", rt.IterationLimit)
+	}
+	if rt.StackDepthLimit <= 0 {
+		t.Fatalf("StackDepthLimit = %d, want > 0", rt.StackDepthLimit)
+	}
+	if rt.NodeLimit <= 0 {
+		t.Fatalf("NodeLimit = %d, want > 0", rt.NodeLimit)
+	}
+	if rt.Iterations <= 0 {
+		t.Fatalf("Iterations = %d, want > 0", rt.Iterations)
+	}
+}
+
+type eofAtZeroTokenSource struct{}
+
+func (eofAtZeroTokenSource) Next() Token {
+	return Token{
+		Symbol:    0,
+		StartByte: 0,
+		EndByte:   0,
+	}
+}
+
+func TestParseRuntimeReportsTokenSourceEOFEarly(t *testing.T) {
+	lang := buildArithmeticLanguage()
+	parser := NewParser(lang)
+	src := []byte("1+2")
+
+	tree, err := parser.ParseWithTokenSource(src, eofAtZeroTokenSource{})
+	if err != nil {
+		t.Fatalf("ParseWithTokenSource() error = %v", err)
+	}
+	rt := tree.ParseRuntime()
+
+	if rt.StopReason != ParseStopTokenSourceEOF {
+		t.Fatalf("StopReason = %q, want %q", rt.StopReason, ParseStopTokenSourceEOF)
+	}
+	if !rt.TokenSourceEOFEarly {
+		t.Fatal("TokenSourceEOFEarly = false, want true")
+	}
+	if rt.LastTokenEndByte != 0 {
+		t.Fatalf("LastTokenEndByte = %d, want 0", rt.LastTokenEndByte)
+	}
+	if !tree.ParseStoppedEarly() {
+		t.Fatal("ParseStoppedEarly() = false, want true")
+	}
+}

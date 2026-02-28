@@ -35,6 +35,40 @@ type Node struct {
 	ownerArena   *nodeArena
 }
 
+// ParseStopReason reports why parseInternal terminated.
+type ParseStopReason string
+
+const (
+	ParseStopNone            ParseStopReason = "none"
+	ParseStopAccepted        ParseStopReason = "accepted"
+	ParseStopNoStacksAlive   ParseStopReason = "no_stacks_alive"
+	ParseStopTokenSourceEOF  ParseStopReason = "token_source_eof"
+	ParseStopIterationLimit  ParseStopReason = "iteration_limit"
+	ParseStopStackDepthLimit ParseStopReason = "stack_depth_limit"
+	ParseStopNodeLimit       ParseStopReason = "node_limit"
+)
+
+// ParseRuntime captures parser-loop diagnostics for a completed tree.
+type ParseRuntime struct {
+	StopReason          ParseStopReason
+	SourceLen           uint32
+	ExpectedEOFByte     uint32
+	RootEndByte         uint32
+	Truncated           bool
+	TokenSourceEOFEarly bool
+	TokensConsumed      uint64
+	LastTokenEndByte    uint32
+	LastTokenSymbol     Symbol
+	LastTokenWasEOF     bool
+	IterationLimit      int
+	StackDepthLimit     int
+	NodeLimit           int
+	Iterations          int
+	NodesAllocated      int
+	PeakStackDepth      int
+	MaxStacksSeen       int
+}
+
 // Symbol returns the node's grammar symbol.
 func (n *Node) Symbol() Symbol { return n.symbol }
 
@@ -474,6 +508,7 @@ type Tree struct {
 	edits         []InputEdit  // pending edits applied to this tree
 	arena         *nodeArena   // primary arena that owns newly-built nodes
 	borrowedArena []*nodeArena // arenas borrowed via subtree reuse
+	parseRuntime  ParseRuntime
 	released      bool
 }
 
@@ -552,6 +587,49 @@ func (t *Tree) Source() []byte { return t.source }
 
 // Language returns the language used to parse this tree.
 func (t *Tree) Language() *Language { return t.language }
+
+// ParseStopReason reports why parsing terminated.
+func (t *Tree) ParseStopReason() ParseStopReason {
+	if t == nil {
+		return ParseStopNone
+	}
+	if t.parseRuntime.StopReason == "" {
+		return ParseStopNone
+	}
+	return t.parseRuntime.StopReason
+}
+
+// ParseStoppedEarly reports whether parsing hit an early-stop condition.
+func (t *Tree) ParseStoppedEarly() bool {
+	switch t.ParseStopReason() {
+	case ParseStopIterationLimit, ParseStopStackDepthLimit, ParseStopNodeLimit, ParseStopTokenSourceEOF:
+		return true
+	default:
+		return false
+	}
+}
+
+// ParseRuntime returns parser-loop diagnostics captured when this tree was built.
+func (t *Tree) ParseRuntime() ParseRuntime {
+	if t == nil {
+		return ParseRuntime{StopReason: ParseStopNone}
+	}
+	out := t.parseRuntime
+	if out.StopReason == "" {
+		out.StopReason = ParseStopNone
+	}
+	return out
+}
+
+func (t *Tree) setParseRuntime(rt ParseRuntime) {
+	if t == nil {
+		return
+	}
+	if rt.StopReason == "" {
+		rt.StopReason = ParseStopNone
+	}
+	t.parseRuntime = rt
+}
 
 // InputEdit describes a single edit to the source text. It tells the parser
 // what byte range was replaced and what the new range looks like, so the
