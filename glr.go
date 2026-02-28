@@ -347,6 +347,9 @@ func gssStacksEqual(a, b gssStack) bool {
 		return false
 	}
 	for an, bn := a.head, b.head; an != nil && bn != nil; an, bn = an.prev, bn.prev {
+		if an == bn {
+			return true
+		}
 		if an.entry.state != bn.entry.state || !stackEntryNodesEquivalent(an.entry.node, bn.entry.node) {
 			return false
 		}
