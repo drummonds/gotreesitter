@@ -211,15 +211,15 @@ cpu: Intel(R) Core(TM) Ultra 9 285
 
 | Runtime | Full parse | Incremental (1-byte edit) | Incremental (no edit) |
 |---|---:|---:|---:|
-| Native C (pure C runtime) | 1.76 ms | 101.7 μs | 100.4 μs |
-| CGo binding (C runtime via cgo) | 1.98 ms | 128.8 μs | 124.5 μs |
-| gotreesitter (pure Go) | 6.77 ms | 2.43 μs | 2.05 ns |
+| Native C (pure C runtime) | 2.42 ms | 140.3 μs | 101.9 μs |
+| CGo binding (C runtime via cgo) | 1.98 ms | 130.0 μs | 202.8 μs |
+| gotreesitter (pure Go) | 6.92 ms | 2.49 μs | 2.08 ns |
 
 On this workload:
 
-- Full parse is ~3.9x slower than native C (~3.4x slower than CGo).
-- Incremental single-byte edits are ~41.9x faster than native C (~53.1x faster than CGo).
-- No-edit reparses are ~49kx faster than native C (~61kx faster than CGo).
+- Full parse is ~2.9x slower than native C (~3.5x slower than CGo).
+- Incremental single-byte edits are ~56.4x faster than native C (~52.3x faster than CGo).
+- No-edit reparses are ~49kx faster than native C (~97.6kx faster than CGo).
 
 <details>
 <summary>Raw benchmark output</summary>
@@ -242,15 +242,15 @@ GOMAXPROCS=1 go test . -run '^$' -tags treesitter_c_bench \
 
 | Benchmark | Median ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| Native C full parse | 1,756,526 | — | — |
-| Native C incremental (1-byte edit) | 101,732 | — | — |
-| Native C incremental (no edit) | 100,385 | — | — |
-| `CTreeSitterGoParseFull` | 1,975,322 | 600 | 6 |
-| `CTreeSitterGoParseIncrementalSingleByteEdit` | 128,830 | 648 | 7 |
-| `CTreeSitterGoParseIncrementalNoEdit` | 124,548 | 600 | 6 |
-| `GoParseFullDFA` | 6,765,290 | 425 | 5 |
-| `GoParseIncrementalSingleByteEditDFA` | 2,426 | 496 | 9 |
-| `GoParseIncrementalNoEditDFA` | 2.045 | 0 | 0 |
+| Native C full parse | 2,416,412 | — | — |
+| Native C incremental (1-byte edit) | 140,266 | — | — |
+| Native C incremental (no edit) | 101,853 | — | — |
+| `CTreeSitterGoParseFull` | 1,984,274 | 600 | 6 |
+| `CTreeSitterGoParseIncrementalSingleByteEdit` | 129,955 | 648 | 7 |
+| `CTreeSitterGoParseIncrementalNoEdit` | 202,811 | 600 | 6 |
+| `GoParseFullDFA` | 6,916,742 | 425 | 5 |
+| `GoParseIncrementalSingleByteEditDFA` | 2,486 | 496 | 9 |
+| `GoParseIncrementalNoEditDFA` | 2.077 | 0 | 0 |
 
 </details>
 
@@ -266,9 +266,9 @@ Emits `bench_out/matrix.json` (machine-readable), `bench_out/matrix.md` (summary
 
 ## Supported languages
 
-206 grammars ship in the registry. 203 currently produce error-free parse trees on smoke samples; 3 are degraded (`disassembly`, `norg`, `vimdoc`). Run `go run ./cmd/parity_report` for current status.
+206 grammars ship in the registry. 205 currently produce error-free parse trees on smoke samples; 1 is degraded (`vimdoc`). Run `go run ./cmd/parity_report` for current status.
 
-- 14 hand-written (😉) Go external scanners (python, elixir, comment, doxygen, foam, nginx, nushell, r, xml, yuck, purescript, typst, html, yaml)
+- 15 hand-written (😉) Go external scanners (python, elixir, comment, doxygen, foam, nginx, nushell, r, xml, yuck, purescript, typst, html, yaml, norg)
 - 8 hand-written Go token sources (authzed, c, go, html, java, json, lua, toml)
 - Remaining languages use the DFA lexer generated from grammar tables
 
@@ -318,9 +318,9 @@ All shipped highlight and tags queries compile (`156/156` highlight, `69/69` tag
 
 ## Known limitations
 
-- **Full-parse throughput**: still slower than the C runtime on cold full parses (currently ~3.9x on the 500-function Go benchmark). Incremental reparsing amortizes this for editor-style workloads.
+- **Full-parse throughput**: still slower than the C runtime on cold full parses (currently ~2.9x on the 500-function Go benchmark). Incremental reparsing amortizes this for editor-style workloads.
 - **GLR safety caps**: The parser enforces iteration, stack depth, and node count limits proportional to input size. These prevent pathological blowup on grammars with high ambiguity but impose a ceiling on the maximum input complexity that parses without error. The caps are tunable but not removable without risking unbounded resource consumption.
-- **Degraded grammars**: 3 of 206 grammars are currently degraded: `disassembly`, `norg`, and `vimdoc`. Check `entry.Quality` and `tree.RootNode().HasError()`.
+- **Degraded grammars**: 1 of 206 grammars is currently degraded: `vimdoc`. Check `entry.Quality` and `tree.RootNode().HasError()`.
 
 ## Adding a language
 
@@ -445,7 +445,7 @@ v0.6.0 — 206 grammars, GLR parser, incremental reparsing, query engine, tree c
 Next:
 - Corpus parity testing against C tree-sitter reference output
 - GLR ambiguity overhead reduction for large files
-- Port norg external scanner
+- Stabilize vimdoc parsing to remove final degraded grammar
 - Fuzz coverage expansion
 
 Release history and retroactive notes are tracked in [CHANGELOG.md](CHANGELOG.md).
