@@ -752,7 +752,6 @@ const errorSymbol = Symbol(65535)
 // For real grammars that need a custom lexer, use ParseWithTokenSource.
 // If the input is empty, it returns a tree with a nil root and no error.
 //
-// Deprecated: prefer ParseWith with option helpers.
 func (p *Parser) Parse(source []byte) (*Tree, error) {
 	if err := p.checkLanguageCompatible(); err != nil {
 		return nil, err
@@ -777,7 +776,6 @@ func (p *Parser) Parse(source []byte) (*Tree, error) {
 // This is used for real grammars where the lexer DFA isn't available
 // as data tables (e.g., Go grammar using go/scanner as a bridge).
 //
-// Deprecated: prefer ParseWith with WithTokenSource.
 func (p *Parser) ParseWithTokenSource(source []byte, ts TokenSource) (*Tree, error) {
 	if err := p.checkLanguageCompatible(); err != nil {
 		return nil, err
@@ -789,7 +787,6 @@ func (p *Parser) ParseWithTokenSource(source []byte, ts TokenSource) (*Tree, err
 // It reuses unchanged subtrees from the old tree for better performance.
 // Call oldTree.Edit() for each edit before calling this method.
 //
-// Deprecated: prefer ParseWith with WithOldTree.
 func (p *Parser) ParseIncremental(source []byte, oldTree *Tree) (*Tree, error) {
 	if err := p.checkLanguageCompatible(); err != nil {
 		return nil, err
@@ -816,7 +813,6 @@ func (p *Parser) ParseIncremental(source []byte, oldTree *Tree) (*Tree, error) {
 // ParseIncrementalWithTokenSource is like ParseIncremental but uses a custom
 // token source.
 //
-// Deprecated: prefer ParseWith with WithOldTree and WithTokenSource.
 func (p *Parser) ParseIncrementalWithTokenSource(source []byte, oldTree *Tree, ts TokenSource) (*Tree, error) {
 	if err := p.checkLanguageCompatible(); err != nil {
 		return nil, err
@@ -830,7 +826,6 @@ func (p *Parser) ParseIncrementalWithTokenSource(source []byte, oldTree *Tree, t
 // ParseIncrementalProfiled is like ParseIncremental and also returns runtime
 // attribution for incremental reuse work vs parse/rebuild work.
 //
-// Deprecated: prefer ParseWith with WithOldTree and WithProfiling.
 func (p *Parser) ParseIncrementalProfiled(source []byte, oldTree *Tree) (*Tree, IncrementalParseProfile, error) {
 	if err := p.checkLanguageCompatible(); err != nil {
 		return nil, IncrementalParseProfile{}, err
@@ -859,7 +854,6 @@ func (p *Parser) ParseIncrementalProfiled(source []byte, oldTree *Tree) (*Tree, 
 // ParseIncrementalWithTokenSourceProfiled is like ParseIncrementalWithTokenSource
 // and also returns runtime attribution for incremental reuse work vs parse/rebuild work.
 //
-// Deprecated: prefer ParseWith with WithOldTree, WithTokenSource, and WithProfiling.
 func (p *Parser) ParseIncrementalWithTokenSourceProfiled(source []byte, oldTree *Tree, ts TokenSource) (*Tree, IncrementalParseProfile, error) {
 	if err := p.checkLanguageCompatible(); err != nil {
 		return nil, IncrementalParseProfile{}, err
