@@ -68,6 +68,8 @@ var parserScratchPool = sync.Pool{
 var (
 	parseNodeLimitScaleOnce sync.Once
 	parseNodeLimitScale     int
+	parseMaxGLRStacksOnce   sync.Once
+	parseMaxGLRStacks       int
 )
 
 const (
@@ -92,6 +94,21 @@ func parseNodeLimitScaleFactor() int {
 		}
 	})
 	return parseNodeLimitScale
+}
+
+func parseMaxGLRStacksValue() int {
+	parseMaxGLRStacksOnce.Do(func() {
+		parseMaxGLRStacks = maxGLRStacks
+		raw := strings.TrimSpace(os.Getenv("GOT_GLR_MAX_STACKS"))
+		if raw == "" {
+			return
+		}
+		n, err := strconv.Atoi(raw)
+		if err == nil && n > 0 {
+			parseMaxGLRStacks = n
+		}
+	})
+	return parseMaxGLRStacks
 }
 
 // IncrementalParseProfile attributes incremental parse time into coarse buckets.
@@ -1890,13 +1907,17 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 	if timing != nil && timing.maxStacksSeen < len(stacks) {
 		timing.maxStacksSeen = len(stacks)
 	}
-	maxStacks := maxGLRStacks
+	maxStacks := parseMaxGLRStacksValue()
 	mergePerKeyCap := maxStacksPerMergeKey
 	if reuse != nil {
 		// Incremental reparses benefit from tighter GLR retention because
 		// edits are localized and we prioritize latency over broad ambiguity fanout.
-		maxStacks = 32
-		mergePerKeyCap = 4
+		if maxStacks > 32 {
+			maxStacks = 32
+		}
+		if mergePerKeyCap > 4 {
+			mergePerKeyCap = 4
+		}
 	}
 	scratch.merge.perKeyCap = mergePerKeyCap
 
