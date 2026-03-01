@@ -19,6 +19,9 @@ type glrStack struct {
 	// score tracks dynamic precedence accumulated through reduce actions.
 	// It is used for tie-breaking when choosing a final parse.
 	score int
+	// stackDepth mirrors current stack length to avoid repeated branching in
+	// merge/compare hot paths.
+	stackDepth int32
 	// dead marks a stack version that encountered an error and should be
 	// removed at the next merge point.
 	dead bool
@@ -99,6 +102,7 @@ func newGLRStack(initial StateID) glrStack {
 	return glrStack{
 		entries:      []stackEntry{{state: initial}},
 		cacheEntries: true,
+		stackDepth:   1,
 	}
 }
 
@@ -126,7 +130,7 @@ func newGLRStackWithScratchCap(initial StateID, scratch *glrEntryScratch, maxIni
 	}
 	entries := scratch.allocWithCap(1, initialCap)
 	entries[0] = stackEntry{state: initial}
-	return glrStack{entries: entries, cacheEntries: true}
+	return glrStack{entries: entries, cacheEntries: true, stackDepth: 1}
 }
 
 func (s *glrStack) ensureGSS(scratch *gssScratch) {
@@ -137,10 +141,7 @@ func (s *glrStack) ensureGSS(scratch *gssScratch) {
 }
 
 func (s *glrStack) depth() int {
-	if s.gss.head != nil {
-		return s.gss.len()
-	}
-	return len(s.entries)
+	return int(s.stackDepth)
 }
 
 func (s *glrStack) top() stackEntry {
@@ -162,6 +163,7 @@ func (s *glrStack) clone() glrStack {
 			cacheEntries: s.cacheEntries,
 			byteOffset:   s.byteOffset,
 			score:        s.score,
+			stackDepth:   s.stackDepth,
 		}
 	}
 	s.ensureGSS(nil)
@@ -170,6 +172,7 @@ func (s *glrStack) clone() glrStack {
 		cacheEntries: s.cacheEntries,
 		byteOffset:   s.byteOffset,
 		score:        s.score,
+		stackDepth:   s.stackDepth,
 	}
 }
 
@@ -180,6 +183,7 @@ func (s *glrStack) cloneWithScratch(scratch *gssScratch) glrStack {
 		cacheEntries: false,
 		byteOffset:   s.byteOffset,
 		score:        s.score,
+		stackDepth:   s.stackDepth,
 	}
 }
 
@@ -232,6 +236,7 @@ func (s *glrStack) push(state StateID, node *Node, entryScratch *glrEntryScratch
 	} else if s.gss.head == nil {
 		s.entries = []stackEntry{{state: state, node: node}}
 	}
+	s.stackDepth++
 	if node != nil {
 		s.byteOffset = node.endByte
 	}
@@ -249,13 +254,15 @@ func (s *glrStack) truncate(depth int) bool {
 				s.entries = s.gss.materialize(s.entries[:0])
 			}
 		}
-		s.byteOffset = s.gss.byteOffset()
-		return true
+	s.stackDepth = int32(depth)
+	s.byteOffset = s.gss.byteOffset()
+	return true
 	}
 	if depth < 0 || depth > len(s.entries) {
 		return false
 	}
 	s.entries = s.entries[:depth]
+	s.stackDepth = int32(depth)
 	s.byteOffset = stackByteOffset(s.entries)
 	return true
 }
