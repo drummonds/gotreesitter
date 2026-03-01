@@ -37,6 +37,8 @@ type InjectionParser struct {
 	injectionQueries map[string]*Query
 	// parsers caches Parser instances per language for reuse.
 	parsers map[string]*Parser
+	// maxDepth limits nested injection recursion. Zero means use default.
+	maxDepth int
 }
 
 // NewInjectionParser creates an InjectionParser.
@@ -174,14 +176,34 @@ func (ip *InjectionParser) ParseIncremental(source []byte, parentLang string,
 	}, nil
 }
 
-// maxInjectionDepth limits recursion to prevent infinite loops.
-const maxInjectionDepth = 10
+// defaultMaxInjectionDepth limits recursion to prevent infinite loops.
+const defaultMaxInjectionDepth = 10
+
+// SetMaxDepth overrides the nested injection recursion limit.
+// Depth values <= 0 restore the default limit.
+func (ip *InjectionParser) SetMaxDepth(depth int) {
+	if ip == nil {
+		return
+	}
+	if depth <= 0 {
+		ip.maxDepth = 0
+		return
+	}
+	ip.maxDepth = depth
+}
+
+func (ip *InjectionParser) effectiveMaxDepth() int {
+	if ip == nil || ip.maxDepth <= 0 {
+		return defaultMaxInjectionDepth
+	}
+	return ip.maxDepth
+}
 
 // findAndParseInjections detects injections in tree and parses them, recursing.
 func (ip *InjectionParser) findAndParseInjections(source []byte, parentLang string,
 	tree *Tree, depth int) ([]Injection, error) {
 
-	if depth >= maxInjectionDepth {
+	if depth >= ip.effectiveMaxDepth() {
 		return nil, nil
 	}
 
