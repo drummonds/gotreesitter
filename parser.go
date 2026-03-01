@@ -1901,7 +1901,7 @@ func (p *Parser) parseInternal(source []byte, ts TokenSource, reuse *reuseCursor
 				perfRecordGlobalCapCull(len(stacks), maxStacks)
 			}
 			sort.SliceStable(stacks, func(i, j int) bool {
-				return stackCompare(stacks[i], stacks[j]) > 0
+				return stackComparePtr(&stacks[i], &stacks[j]) > 0
 			})
 			stacks = stacks[:maxStacks]
 		}
@@ -2199,7 +2199,7 @@ func (p *Parser) promotePrimaryStack(stacks []glrStack) {
 	}
 	best := 0
 	for i := 1; i < len(stacks); i++ {
-		if stackCompare(stacks[i], stacks[best]) > 0 {
+		if stackComparePtr(&stacks[i], &stacks[best]) > 0 {
 			best = i
 		}
 	}
@@ -2931,7 +2931,7 @@ func (p *Parser) buildResultFromGLR(stacks []glrStack, source []byte, arena *nod
 
 	best := 0
 	for i := 1; i < len(stacks); i++ {
-		if stackCompare(stacks[i], stacks[best]) > 0 {
+		if stackComparePtr(&stacks[i], &stacks[best]) > 0 {
 			best = i
 		}
 	}

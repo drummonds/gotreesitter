@@ -466,6 +466,10 @@ func stackEntryNodesEquivalent(a, b *Node) bool {
 // stackCompare defines the total ordering for stack preference.
 // Positive means `a` is preferred over `b`, negative means worse.
 func stackCompare(a, b glrStack) int {
+	return stackComparePtr(&a, &b)
+}
+
+func stackComparePtr(a, b *glrStack) int {
 	if perfCountersEnabled {
 		perfRecordStackCompare()
 	}
