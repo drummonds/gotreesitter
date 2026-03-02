@@ -235,3 +235,18 @@ func encodeLanguageBlob(lang *gotreesitter.Language) ([]byte, error) {
 	}
 	return out.Bytes(), nil
 }
+
+// decodeLanguageBlob deserializes a gob+gzip Language blob.
+func decodeLanguageBlob(data []byte) (*gotreesitter.Language, error) {
+	gzr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("open gzip: %w", err)
+	}
+	defer gzr.Close()
+
+	var lang gotreesitter.Language
+	if err := gob.NewDecoder(gzr).Decode(&lang); err != nil {
+		return nil, fmt.Errorf("decode language blob: %w", err)
+	}
+	return &lang, nil
+}

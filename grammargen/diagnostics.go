@@ -176,6 +176,12 @@ func Validate(g *Grammar) []string {
 	for _, name := range g.RuleOrder {
 		defined[name] = true
 	}
+	// External symbols are also valid references.
+	for _, ext := range g.Externals {
+		if ext.Kind == RuleSymbol && ext.Value != "" {
+			defined[ext.Value] = true
+		}
+	}
 	for _, name := range g.RuleOrder {
 		refs := collectSymbolRefs(g.Rules[name])
 		for _, ref := range refs {
