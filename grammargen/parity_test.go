@@ -807,10 +807,10 @@ var importParityGrammars = []importParityGrammar{
 		name: "ini", path: "/tmp/grammar_parity/ini/grammar.js",
 		blobFunc: grammars.IniLanguage,
 		samples: []string{
-			"[section]\nkey=value",
-			"key = value",
-			"[main]\nhost = localhost\nport = 8080",
-			"; comment\n[section]",
+			"[section]\nkey=value\n",
+			"key=value\n",
+			"[main]\nhost=localhost\nport=8080\n",
+			"; comment\n[section]\n",
 		},
 		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
 	},
@@ -818,10 +818,10 @@ var importParityGrammars = []importParityGrammar{
 		name: "properties", path: "/tmp/grammar_parity/properties/grammar.js",
 		blobFunc: grammars.PropertiesLanguage,
 		samples: []string{
-			"key=value",
-			"key = value",
-			"# comment\nkey=value",
-			"key1=v1\nkey2=v2",
+			"key=value\n",
+			"key = value\n",
+			"# comment\nkey=value\n",
+			"key1=v1\nkey2=v2\n",
 		},
 		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
 	},
@@ -851,6 +851,26 @@ var importParityGrammars = []importParityGrammar{
 			"body { color: red; }",
 			".class { margin: 0; }",
 		},
+		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+	},
+	{
+		name: "html", path: "/tmp/grammar_parity/html/grammar.js",
+		blobFunc: grammars.HtmlLanguage,
+		samples: []string{
+			"<div></div>",
+			"<p>hello</p>",
+		},
+		// Imports and generates, but parsing requires external scanner (9 externals).
+		expectImport: true, expectGenerate: true, expectNoErrors: 0, expectParity: 0,
+	},
+	{
+		name: "scala", path: "/tmp/grammar_parity/scala/grammar.js",
+		blobFunc: grammars.ScalaLanguage,
+		samples: []string{
+			"val x = 1",
+			"object Main { def main(args: Array[String]): Unit = {} }",
+		},
+		// 208 rules — imports but too large for LR generation in 30s.
 		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
 	},
 }

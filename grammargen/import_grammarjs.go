@@ -30,11 +30,12 @@ func ImportGrammarJS(source []byte) (*Grammar, error) {
 }
 
 type jsImporter struct {
-	source      []byte
-	lang        *gotreesitter.Language
-	helperFuncs map[string]*gotreesitter.Node // top-level function declarations (commaSep, etc.)
-	paramSubst  map[string]*Rule              // active parameter substitutions for helper inlining
-	localConsts map[string]*gotreesitter.Node  // local const declarations in current rule body
+	source         []byte
+	lang           *gotreesitter.Language
+	helperFuncs    map[string]*gotreesitter.Node    // top-level function declarations (commaSep, etc.)
+	paramSubst     map[string]*Rule                 // active parameter substitutions for helper inlining
+	localConsts    map[string]*gotreesitter.Node     // local const declarations in current rule body
+	topLevelConsts map[string]map[string]int         // top-level const objects: PREC.control → int
 }
 
 // nodeText returns the source text of a node.
@@ -52,6 +53,8 @@ func (imp *jsImporter) nodeType(n *gotreesitter.Node) string {
 func (imp *jsImporter) extract(root *gotreesitter.Node) (*Grammar, error) {
 	// Collect top-level helper functions (commaSep, sep, etc.) before processing grammar.
 	imp.collectHelperFunctions(root)
+	// Collect top-level const objects (PREC = {...}) for member expression resolution.
+	imp.collectTopLevelConsts(root)
 
 	grammarObj, err := imp.findGrammarCall(root)
 	if err != nil {
@@ -645,14 +648,38 @@ func (imp *jsImporter) extractWordRef(n *gotreesitter.Node) string {
 	return imp.nodeText(body)
 }
 
-// extractIntValue extracts an integer from a number or unary expression node.
+// extractIntValue extracts an integer from a number, unary expression, or
+// member expression like PREC.control. String precedence values (used in some
+// grammars like Scala) are treated as 0.
 func (imp *jsImporter) extractIntValue(n *gotreesitter.Node) (int, error) {
+	// Try direct integer parse first.
 	text := imp.nodeText(n)
-	v, err := strconv.Atoi(text)
-	if err != nil {
-		return 0, fmt.Errorf("expected integer, got %q", text)
+	if v, err := strconv.Atoi(text); err == nil {
+		return v, nil
 	}
-	return v, nil
+
+	// Check for member expression: OBJ.KEY (e.g., PREC.control)
+	if imp.nodeType(n) == "member_expression" {
+		objNode := n.ChildByFieldName("object", imp.lang)
+		propNode := n.ChildByFieldName("property", imp.lang)
+		if objNode != nil && propNode != nil {
+			objName := imp.nodeText(objNode)
+			propName := imp.nodeText(propNode)
+			if vals, ok := imp.topLevelConsts[objName]; ok {
+				if v, ok := vals[propName]; ok {
+					return v, nil
+				}
+				return 0, fmt.Errorf("const %s has no key %q", objName, propName)
+			}
+		}
+	}
+
+	// String precedence values (e.g., prec.left("end", ...)) — treat as 0.
+	if imp.nodeType(n) == "string" || imp.nodeType(n) == "template_string" {
+		return 0, nil
+	}
+
+	return 0, fmt.Errorf("expected integer, got %q", text)
 }
 
 // extractRegexPattern extracts the pattern from a regex literal /pattern/flags.
@@ -672,6 +699,57 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// collectTopLevelConsts scans the root for top-level const declarations
+// that are objects mapping string keys to integers (like PREC = {control: 1, ...}).
+func (imp *jsImporter) collectTopLevelConsts(root *gotreesitter.Node) {
+	imp.topLevelConsts = make(map[string]map[string]int)
+	for i := 0; i < int(root.NamedChildCount()); i++ {
+		child := root.NamedChild(i)
+		if imp.nodeType(child) != "lexical_declaration" {
+			continue
+		}
+		// Look for: const NAME = { key: val, ... }
+		for j := 0; j < int(child.NamedChildCount()); j++ {
+			decl := child.NamedChild(j)
+			if imp.nodeType(decl) != "variable_declarator" {
+				continue
+			}
+			nc := int(decl.NamedChildCount())
+			if nc < 2 {
+				continue
+			}
+			nameNode := decl.NamedChild(0)
+			valueNode := decl.NamedChild(nc - 1)
+			if imp.nodeType(valueNode) != "object" {
+				continue
+			}
+			constName := imp.nodeText(nameNode)
+			vals := make(map[string]int)
+			for k := 0; k < int(valueNode.NamedChildCount()); k++ {
+				pair := valueNode.NamedChild(k)
+				if imp.nodeType(pair) != "pair" {
+					continue
+				}
+				key := imp.getPairKey(pair)
+				val := imp.getPairValue(pair)
+				if val != nil {
+					text := imp.nodeText(val)
+					// Handle negative numbers
+					if imp.nodeType(val) == "unary_expression" {
+						text = imp.nodeText(val)
+					}
+					if n, err := strconv.Atoi(text); err == nil {
+						vals[key] = n
+					}
+				}
+			}
+			if len(vals) > 0 {
+				imp.topLevelConsts[constName] = vals
+			}
+		}
+	}
 }
 
 // collectHelperFunctions scans the root for top-level function declarations
