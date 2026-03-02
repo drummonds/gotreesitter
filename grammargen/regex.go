@@ -469,12 +469,12 @@ func unicodePropertyRanges(name string) ([]runeRange, error) {
 		table = unicode.Cc
 	case "Cf", "Format":
 		table = unicode.Cf
-	case "XID_Start":
-		// Approximation: Letter ∪ Nl (covers the vast majority of XID_Start)
+	case "XID_Start", "ID_Start":
+		// Approximation: Letter ∪ Nl (covers the vast majority of XID_Start/ID_Start)
 		ranges := rangeTableToRuneRanges(unicode.Letter)
 		ranges = append(ranges, rangeTableToRuneRanges(unicode.Nl)...)
 		return ranges, nil
-	case "XID_Continue":
+	case "XID_Continue", "ID_Continue":
 		// Approximation: Letter ∪ Nl ∪ Mn ∪ Mc ∪ Nd ∪ Pc
 		ranges := rangeTableToRuneRanges(unicode.Letter)
 		ranges = append(ranges, rangeTableToRuneRanges(unicode.Nl)...)

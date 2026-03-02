@@ -1074,7 +1074,30 @@ var importParityGrammars = []importParityGrammar{
 			"HEALTHCHECK CMD curl -f http://localhost/ || exit 1\n",
 			"# just a comment\n",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 10, expectParity: 4,
+		expectImport: true, expectGenerate: true, expectNoErrors: 10, expectParity: 5,
+	},
+	{
+		name: "gitattributes", jsonPath: "/tmp/grammar_parity/gitattributes/src/grammar.json",
+		blobFunc: grammars.GitattributesLanguage,
+		samples: []string{
+			"# a comment\n",
+			"\n",
+			"",
+			"# first\n# second\n",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 3,
+	},
+	{
+		name: "nix", jsonPath: "/tmp/grammar_parity/nix/src/grammar.json",
+		blobFunc: grammars.NixLanguage,
+		samples: []string{
+			"42",
+			"true",
+			"null",
+			"{ x = 1; }",
+		},
+		// 49 rules → LR table construction exceeds 30s timeout
+		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
 	},
 }
 
