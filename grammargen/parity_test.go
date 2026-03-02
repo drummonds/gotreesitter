@@ -943,6 +943,28 @@ var importParityGrammars = []importParityGrammar{
 		},
 		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 4,
 	},
+	{
+		name: "ron", jsonPath: "/tmp/grammar_parity/ron/src/grammar.json",
+		blobFunc: grammars.RonLanguage,
+		samples: []string{
+			"(x: 1, y: 2)",
+			"[1, 2, 3]",
+			"true",
+			`"hello"`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 3,
+	},
+	{
+		name: "toml", jsonPath: "/tmp/grammar_parity/toml/src/grammar.json",
+		blobFunc: grammars.TomlLanguage,
+		samples: []string{
+			"key = \"value\"\n",
+			"[section]\nkey = 1\n",
+			"arr = [1, 2, 3]\n",
+			"[server]\nhost = \"localhost\"\nport = 8080\n",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 2,
+	},
 }
 
 // generateWithTimeout runs GenerateLanguage with a deadline. Returns nil, err
