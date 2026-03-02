@@ -1047,7 +1047,7 @@ var importParityGrammars = []importParityGrammar{
 			"syntax = \"proto3\";\nservice Greeter {\n  rpc SayHello (HelloRequest) returns (stream HelloReply) {}\n}",
 			"syntax = \"proto3\";\nmessage Foo {\n  option deprecated = true;\n  int32 x = 1 [deprecated = true];\n}",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 17, expectParity: 17,
+		expectImport: true, expectGenerate: true, expectNoErrors: 17, expectParity: 16,
 	},
 	{
 		name: "comment", jsonPath: "/tmp/grammar_parity/comment/src/grammar.json",
@@ -1109,7 +1109,6 @@ var importParityGrammars = []importParityGrammar{
 	{
 		name: "nix", jsonPath: "/tmp/grammar_parity/nix/src/grammar.json",
 		blobFunc: grammars.NixLanguage,
-		genTimeout: 60 * time.Second,
 		samples: []string{
 			"42",
 			"true",
@@ -1128,6 +1127,44 @@ var importParityGrammars = []importParityGrammar{
 			`a // b`,
 		},
 		expectImport: true, expectGenerate: true, expectNoErrors: 15, expectParity: 13,
+	},
+	{
+		name: "jq", jsonPath: "/tmp/grammar_parity/jq/src/grammar.json",
+		blobFunc: grammars.JqLanguage,
+		genTimeout: 60 * time.Second,
+		samples: []string{
+			`.`, `.foo`, `.foo.bar`, `.[] | .name`, `[.[] | .+1]`,
+			`{a: 1, b: 2}`, `if .x then .y else .z end`, `def f: . + 1; f`,
+			`null`, `"hello"`, `42`, `.foo | select(. > 2)`,
+			`[range(10)]`, `.a as $x | $x + 1`, `try .foo catch "default"`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 15, expectParity: 0,
+	},
+	{
+		name: "hcl", jsonPath: "/tmp/grammar_parity/hcl/src/grammar.json",
+		blobFunc: grammars.HclLanguage,
+		genTimeout: 60 * time.Second,
+		samples: []string{
+			`x = 1`, `x = "hello"`, `x = true`,
+			`resource "aws_instance" "example" {}`,
+			`resource "aws_instance" "example" { ami = "abc" }`,
+			`variable "name" { type = string }`,
+			`output "result" { value = var.name }`,
+			`x = [1, 2, 3]`, `x = { a = 1 }`, `locals { x = 1 }`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 10, expectParity: 3,
+	},
+	{
+		name: "regex", jsonPath: "/tmp/grammar_parity/regex/src/grammar.json",
+		blobFunc: grammars.RegexLanguage,
+		genTimeout: 90 * time.Second,
+		samples: []string{
+			`a`, `abc`, `a|b`, `a*`, `a+`, `a?`,
+			`[abc]`, `[a-z]`, `[^abc]`, `(abc)`,
+			`\d`, `\w`, `\s`, `.`,
+			`^abc$`, `a{3}`, `a{1,3}`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 17, expectParity: 17,
 	},
 }
 

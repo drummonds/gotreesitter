@@ -152,8 +152,9 @@ type lrContext struct {
 	prodsByLHS map[int][]int
 
 	// Item set management
-	itemSets  []lrItemSet
-	itemSetMap map[string]int // key → index
+	itemSets   []lrItemSet
+	itemSetMap map[string]int // full LR(1) key → index
+	coreMap    map[string]int // core key (prodIdx+dot only) → index
 }
 
 // computeFirstSets computes FIRST sets for all symbols.
@@ -312,17 +313,19 @@ func (ctx *lrContext) gotoState(set lrItemSet, sym int) int {
 	}
 
 	closed := ctx.closure(advanced)
-	key := itemSetKey(closed)
-
-	if idx, ok := ctx.itemSetMap[key]; ok {
+	core := coreKey(closed)
+	if idx, ok := ctx.coreMap[core]; ok {
 		return idx
 	}
 	return -1
 }
 
-// buildItemSets constructs the canonical collection of LR(1) item sets.
+// buildItemSets constructs LALR(1) item sets using core-based merging.
+// States with the same core (same prodIdx+dot pairs, ignoring lookaheads)
+// are merged, producing dramatically fewer states than full LR(1).
 func (ctx *lrContext) buildItemSets() []lrItemSet {
 	ctx.itemSetMap = make(map[string]int)
+	ctx.coreMap = make(map[string]int)
 
 	// Initial item set: closure of [S' → .S, $end]
 	initial := ctx.closure([]lrItem{{
@@ -332,14 +335,18 @@ func (ctx *lrContext) buildItemSets() []lrItemSet {
 	}})
 
 	initialKey := itemSetKey(initial)
+	initialCore := coreKey(initial)
 	ctx.itemSets = []lrItemSet{{items: initial, key: initialKey}}
 	ctx.itemSetMap[initialKey] = 0
+	ctx.coreMap[initialCore] = 0
 
 	worklist := []int{0}
+	inWorklist := map[int]bool{0: true}
 
 	for len(worklist) > 0 {
 		stateIdx := worklist[0]
 		worklist = worklist[1:]
+		inWorklist[stateIdx] = false
 		itemSet := ctx.itemSets[stateIdx]
 
 		// Collect all symbols after the dot.
@@ -374,13 +381,28 @@ func (ctx *lrContext) buildItemSets() []lrItemSet {
 			}
 
 			closed := ctx.closure(advanced)
-			key := itemSetKey(closed)
+			core := coreKey(closed)
 
-			if _, exists := ctx.itemSetMap[key]; !exists {
+			if existingIdx, exists := ctx.coreMap[core]; exists {
+				// LALR merge: add any new lookaheads to the existing state.
+				if merged := mergeItems(&ctx.itemSets[existingIdx], closed); merged {
+					// Re-close the merged state to propagate new lookaheads.
+					ctx.itemSets[existingIdx].items = ctx.closure(ctx.itemSets[existingIdx].items)
+					// Re-process this state since items changed.
+					if !inWorklist[existingIdx] {
+						worklist = append(worklist, existingIdx)
+						inWorklist[existingIdx] = true
+					}
+				}
+			} else {
+				// New core — create a new state.
 				newIdx := len(ctx.itemSets)
+				key := itemSetKey(closed)
 				ctx.itemSetMap[key] = newIdx
+				ctx.coreMap[core] = newIdx
 				ctx.itemSets = append(ctx.itemSets, lrItemSet{items: closed, key: key})
 				worklist = append(worklist, newIdx)
+				inWorklist[newIdx] = true
 			}
 		}
 	}
@@ -388,7 +410,58 @@ func (ctx *lrContext) buildItemSets() []lrItemSet {
 	return ctx.itemSets
 }
 
-// itemSetKey computes a canonical string key for an item set.
+// mergeItems adds items from src into dst, returning true if any new items were added.
+func mergeItems(dst *lrItemSet, src []lrItem) bool {
+	type itemKey struct{ prodIdx, dot, lookahead int }
+	existing := make(map[itemKey]bool, len(dst.items))
+	for _, item := range dst.items {
+		existing[itemKey{item.prodIdx, item.dot, item.lookahead}] = true
+	}
+
+	added := false
+	for _, item := range src {
+		k := itemKey{item.prodIdx, item.dot, item.lookahead}
+		if !existing[k] {
+			dst.items = append(dst.items, item)
+			existing[k] = true
+			added = true
+		}
+	}
+	return added
+}
+
+// coreKey computes a key from only the (prodIdx, dot) pairs, ignoring lookaheads.
+// States with the same core key are LALR-mergeable.
+func coreKey(items []lrItem) string {
+	// Collect unique (prodIdx, dot) pairs.
+	type core struct{ prodIdx, dot int }
+	seen := make(map[core]bool)
+	var cores []core
+	for _, item := range items {
+		c := core{item.prodIdx, item.dot}
+		if !seen[c] {
+			seen[c] = true
+			cores = append(cores, c)
+		}
+	}
+	sort.Slice(cores, func(i, j int) bool {
+		if cores[i].prodIdx != cores[j].prodIdx {
+			return cores[i].prodIdx < cores[j].prodIdx
+		}
+		return cores[i].dot < cores[j].dot
+	})
+
+	buf := make([]byte, 0, len(cores)*4)
+	for _, c := range cores {
+		buf = append(buf,
+			byte(c.prodIdx>>8), byte(c.prodIdx),
+			byte(c.dot>>8), byte(c.dot),
+		)
+	}
+	return string(buf)
+}
+
+// itemSetKey computes a canonical string key for an item set (full LR(1) key).
 func itemSetKey(items []lrItem) string {
 	// Sort items for canonical form.
 	sorted := make([]lrItem, len(items))
