@@ -92,32 +92,32 @@ var hasDedicatedSample = func() map[string]bool {
 // in knownHighlightDivergence). Failures here are merge-blocking.
 var curatedLanguages = map[string]bool{
 	"bash":       true,
-	"c":         true,
-	"cpp":       true,
-	"css":       true,
-	"d":         true,
-	"elixir":    true,
-	"go":        true,
-	"html":      true,
-	"ini":       true,
-	"java":      true,
+	"c":          true,
+	"cpp":        true,
+	"css":        true,
+	"d":          true,
+	"elixir":     true,
+	"go":         true,
+	"html":       true,
+	"ini":        true,
+	"java":       true,
 	"javascript": true,
-	"julia":     true,
-	"kotlin":    true,
-	"lua":       true,
-	"make":      true,
-	"php":       true,
-	"python":    true,
-	"ruby":      true,
-	"rust":      true,
-	"scala":     true,
-	"scss":      true,
-	"sql":       true,
-	"swift":     true,
-	"toml":      true,
-	"tsx":       true,
+	"julia":      true,
+	"kotlin":     true,
+	"lua":        true,
+	"make":       true,
+	"php":        true,
+	"python":     true,
+	"ruby":       true,
+	"rust":       true,
+	"scala":      true,
+	"scss":       true,
+	"sql":        true,
+	"swift":      true,
+	"toml":       true,
+	"tsx":        true,
 	"typescript": true,
-	"yaml":      true,
+	"yaml":       true,
 }
 
 var parityEntriesByName, paritySupportByName = func() (map[string]grammars.LangEntry, map[string]grammars.ParseSupport) {
@@ -441,6 +441,58 @@ func insertSpaceAt(src []byte, insertAt int) []byte {
 	return edited
 }
 
+type incrementalEditCandidate struct {
+	label       string
+	start       int
+	oldEnd      int
+	replacement []byte
+}
+
+func (c incrementalEditCandidate) newEnd() int {
+	return c.start + len(c.replacement)
+}
+
+func applyEditCandidate(src []byte, c incrementalEditCandidate) []byte {
+	if c.start < 0 {
+		c.start = 0
+	}
+	if c.start > len(src) {
+		c.start = len(src)
+	}
+	if c.oldEnd < c.start {
+		c.oldEnd = c.start
+	}
+	if c.oldEnd > len(src) {
+		c.oldEnd = len(src)
+	}
+	outLen := len(src) - (c.oldEnd - c.start) + len(c.replacement)
+	edited := make([]byte, outLen)
+	pos := 0
+	pos += copy(edited[pos:], src[:c.start])
+	pos += copy(edited[pos:], c.replacement)
+	copy(edited[pos:], src[c.oldEnd:])
+	return edited
+}
+
+func replacementByteForIncrementalParity(b byte) (byte, bool) {
+	switch {
+	case b >= '0' && b <= '8':
+		return b + 1, true
+	case b == '9':
+		return '0', true
+	case b >= 'a' && b <= 'y':
+		return b + 1, true
+	case b == 'z':
+		return 'a', true
+	case b >= 'A' && b <= 'Y':
+		return b + 1, true
+	case b == 'Z':
+		return 'A', true
+	default:
+		return 0, false
+	}
+}
+
 func isWordByte(b byte) bool {
 	return (b >= 'a' && b <= 'z') ||
 		(b >= 'A' && b <= 'Z') ||
@@ -500,10 +552,54 @@ func incrementalEditOffsets(src []byte) []int {
 	return offsets
 }
 
-// safeEditSource inserts one ASCII space at the preferred offset.
-func safeEditSource(src []byte) ([]byte, int) {
-	insertAt := safeEditOffset(src)
-	return insertSpaceAt(src, insertAt), insertAt
+// incrementalEditCandidates returns preferred one-byte edits for incremental
+// parity checks. It tries insertion sites first, then safe one-byte
+// replacements (digits/letters) as a fallback for token-source backends where
+// insertion-only edits can produce non-comparable fresh parses.
+func incrementalEditCandidates(src []byte) []incrementalEditCandidate {
+	offsets := incrementalEditOffsets(src)
+	candidates := make([]incrementalEditCandidate, 0, len(offsets)+len(src)/2)
+	for _, pos := range offsets {
+		candidates = append(candidates, incrementalEditCandidate{
+			label:       fmt.Sprintf("insert-space@%d", pos),
+			start:       pos,
+			oldEnd:      pos,
+			replacement: []byte{' '},
+		})
+	}
+
+	seenReplace := make([]bool, len(src))
+	addReplace := func(i int) {
+		if i < 0 || i >= len(src) || seenReplace[i] {
+			return
+		}
+		repl, ok := replacementByteForIncrementalParity(src[i])
+		if !ok || repl == src[i] {
+			return
+		}
+		seenReplace[i] = true
+		candidates = append(candidates, incrementalEditCandidate{
+			label:       fmt.Sprintf("replace@%d:%q->%q", i, src[i], repl),
+			start:       i,
+			oldEnd:      i + 1,
+			replacement: []byte{repl},
+		})
+	}
+
+	// Prefer replacing digits first (usually syntax-safe in smoke samples),
+	// then letters.
+	for i := 0; i < len(src); i++ {
+		if src[i] >= '0' && src[i] <= '9' {
+			addReplace(i)
+		}
+	}
+	for i := 0; i < len(src); i++ {
+		if isWordByte(src[i]) {
+			addReplace(i)
+		}
+	}
+
+	return candidates
 }
 
 // TestParityFreshParse verifies that fresh parse trees match the CGo binding
@@ -562,23 +658,24 @@ func TestParityIncrementalParse(t *testing.T) {
 				t.Fatalf("[%s/incremental] C parser SetLanguage error: %v", tc.name, err)
 			}
 
-			candidates := incrementalEditOffsets(src)
+			candidates := incrementalEditCandidates(src)
 			edited := []byte(nil)
-			editAt := -1
+			var chosen incrementalEditCandidate
+			chosenOK := false
 			validSiteCount := 0
 			firstFreshErr := ""
 			firstIncrErr := ""
-			for _, candidateAt := range candidates {
-				candidateEdited := insertSpaceAt(src, candidateAt)
+			for _, candidate := range candidates {
+				candidateEdited := applyEditCandidate(src, candidate)
 
 				goFreshTree, goFreshLang, err := parseWithGo(tc, candidateEdited, nil)
 				if err != nil {
-					t.Fatalf("[%s/incremental] gotreesitter fresh parse on candidate edit@%d error: %v", tc.name, candidateAt, err)
+					t.Fatalf("[%s/incremental] gotreesitter fresh parse on candidate %s error: %v", tc.name, candidate.label, err)
 				}
 
 				cFreshTree := cParser.Parse(candidateEdited, nil)
 				if cFreshTree == nil || cFreshTree.RootNode() == nil {
-					t.Fatalf("[%s/incremental] C reference parser returned nil tree on candidate edit@%d", tc.name, candidateAt)
+					t.Fatalf("[%s/incremental] C reference parser returned nil tree on candidate %s", tc.name, candidate.label)
 				}
 
 				var freshErrs []string
@@ -586,7 +683,7 @@ func TestParityIncrementalParse(t *testing.T) {
 				cFreshTree.Close()
 				if len(freshErrs) > 0 {
 					if firstFreshErr == "" {
-						firstFreshErr = freshErrs[0]
+						firstFreshErr = fmt.Sprintf("%s: %s", candidate.label, freshErrs[0])
 					}
 					continue
 				}
@@ -595,42 +692,43 @@ func TestParityIncrementalParse(t *testing.T) {
 				// incremental parse on edited source must match Go fresh parse.
 				candidateOldTree, _, err := parseWithGo(tc, src, nil)
 				if err != nil {
-					t.Fatalf("[%s/incremental] gotreesitter candidate old-tree parse@%d error: %v", tc.name, candidateAt, err)
+					t.Fatalf("[%s/incremental] gotreesitter candidate old-tree parse on %s error: %v", tc.name, candidate.label, err)
 				}
 				candidateEdit := gotreesitter.InputEdit{
-					StartByte:   uint32(candidateAt),
-					OldEndByte:  uint32(candidateAt),
-					NewEndByte:  uint32(candidateAt + 1),
-					StartPoint:  pointAtOffset(src, candidateAt),
-					OldEndPoint: pointAtOffset(src, candidateAt),
-					NewEndPoint: pointAtOffset(candidateEdited, candidateAt+1),
+					StartByte:   uint32(candidate.start),
+					OldEndByte:  uint32(candidate.oldEnd),
+					NewEndByte:  uint32(candidate.newEnd()),
+					StartPoint:  pointAtOffset(src, candidate.start),
+					OldEndPoint: pointAtOffset(src, candidate.oldEnd),
+					NewEndPoint: pointAtOffset(candidateEdited, candidate.newEnd()),
 				}
 				candidateOldTree.Edit(candidateEdit)
 
 				goIncrTree, goIncrLang, err := parseWithGo(tc, candidateEdited, candidateOldTree)
 				if err != nil {
-					t.Fatalf("[%s/incremental] gotreesitter candidate incremental parse@%d error: %v", tc.name, candidateAt, err)
+					t.Fatalf("[%s/incremental] gotreesitter candidate incremental parse on %s error: %v", tc.name, candidate.label, err)
 				}
 
 				var incrErrs []string
 				compareGoNodes(goIncrTree.RootNode(), goIncrLang, goFreshTree.RootNode(), "root", &incrErrs)
 				if len(incrErrs) > 0 {
 					if firstIncrErr == "" {
-						firstIncrErr = incrErrs[0]
+						firstIncrErr = fmt.Sprintf("%s: %s", candidate.label, incrErrs[0])
 					}
 					continue
 				}
 
 				validSiteCount++
-				if editAt < 0 {
+				if !chosenOK {
 					edited = candidateEdited
-					editAt = candidateAt
+					chosen = candidate
+					chosenOK = true
 				}
 			}
 			if tc.name == "html" {
 				t.Logf("[%s/incremental] valid edit sites=%d/%d", tc.name, validSiteCount, len(candidates))
 			}
-			if editAt < 0 {
+			if !chosenOK {
 				reason := firstFreshErr
 				if reason == "" {
 					reason = firstIncrErr
@@ -642,12 +740,12 @@ func TestParityIncrementalParse(t *testing.T) {
 			}
 
 			edit := gotreesitter.InputEdit{
-				StartByte:   uint32(editAt),
-				OldEndByte:  uint32(editAt),
-				NewEndByte:  uint32(editAt + 1),
-				StartPoint:  pointAtOffset(src, editAt),
-				OldEndPoint: pointAtOffset(src, editAt),
-				NewEndPoint: pointAtOffset(edited, editAt+1),
+				StartByte:   uint32(chosen.start),
+				OldEndByte:  uint32(chosen.oldEnd),
+				NewEndByte:  uint32(chosen.newEnd()),
+				StartPoint:  pointAtOffset(src, chosen.start),
+				OldEndPoint: pointAtOffset(src, chosen.oldEnd),
+				NewEndPoint: pointAtOffset(edited, chosen.newEnd()),
 			}
 
 			oldTree.Edit(edit)
