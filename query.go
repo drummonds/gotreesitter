@@ -648,6 +648,90 @@ func (q *Query) CaptureNames() []string {
 	return q.captures
 }
 
+// IsPatternRooted reports whether the pattern has exactly one root step at
+// depth 0. Rooted patterns start matching from a single concrete root.
+func (q *Query) IsPatternRooted(patternIndex uint32) bool {
+	if q == nil {
+		return false
+	}
+	idx := int(patternIndex)
+	if idx < 0 || idx >= len(q.patterns) {
+		return false
+	}
+	steps := q.patterns[idx].steps
+	if len(steps) == 0 {
+		return false
+	}
+	rootCount := 0
+	for _, step := range steps {
+		if step.depth == 0 {
+			rootCount++
+		}
+	}
+	return rootCount == 1
+}
+
+// IsPatternNonLocal reports whether the pattern can begin at multiple roots.
+func (q *Query) IsPatternNonLocal(patternIndex uint32) bool {
+	return !q.IsPatternRooted(patternIndex)
+}
+
+// StepIsDefinite reports whether a pattern step matches a definite symbol
+// (i.e. not wildcard).
+func (q *Query) StepIsDefinite(patternIndex uint32, stepIndex uint32) bool {
+	if q == nil {
+		return false
+	}
+	pi := int(patternIndex)
+	if pi < 0 || pi >= len(q.patterns) {
+		return false
+	}
+	si := int(stepIndex)
+	steps := q.patterns[pi].steps
+	if si < 0 || si >= len(steps) {
+		return false
+	}
+	step := steps[si]
+	if step.symbol == 0 {
+		return false
+	}
+	if len(step.alternatives) > 0 {
+		for _, alt := range step.alternatives {
+			if alt.symbol == 0 || alt.textMatch != "" {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// IsPatternGuaranteedAtStep reports whether all steps through stepIndex are
+// definite and non-quantified.
+func (q *Query) IsPatternGuaranteedAtStep(patternIndex uint32, stepIndex uint32) bool {
+	if q == nil {
+		return false
+	}
+	pi := int(patternIndex)
+	if pi < 0 || pi >= len(q.patterns) {
+		return false
+	}
+	si := int(stepIndex)
+	steps := q.patterns[pi].steps
+	if si < 0 || si >= len(steps) {
+		return false
+	}
+	for i := 0; i <= si; i++ {
+		step := steps[i]
+		if step.quantifier != queryQuantifierOne {
+			return false
+		}
+		if !q.StepIsDefinite(patternIndex, uint32(i)) {
+			return false
+		}
+	}
+	return true
+}
+
 // DisableCapture removes captures with the given name from future query
 // results. Matching behavior is unchanged; only returned captures are filtered.
 func (q *Query) DisableCapture(name string) {

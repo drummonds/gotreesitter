@@ -952,6 +952,38 @@ func TestCaptureDeduplicated(t *testing.T) {
 	}
 }
 
+func TestQueryPatternMetadata(t *testing.T) {
+	lang := queryTestLanguage()
+
+	q, err := NewQuery(`(identifier) @id`, lang)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if !q.IsPatternRooted(0) {
+		t.Fatal("IsPatternRooted(0) = false, want true")
+	}
+	if q.IsPatternNonLocal(0) {
+		t.Fatal("IsPatternNonLocal(0) = true, want false")
+	}
+	if !q.StepIsDefinite(0, 0) {
+		t.Fatal("StepIsDefinite(0,0) = false, want true")
+	}
+	if !q.IsPatternGuaranteedAtStep(0, 0) {
+		t.Fatal("IsPatternGuaranteedAtStep(0,0) = false, want true")
+	}
+
+	wild, err := NewQuery(`(_) @any`, lang)
+	if err != nil {
+		t.Fatalf("wildcard parse error: %v", err)
+	}
+	if wild.StepIsDefinite(0, 0) {
+		t.Fatal("wildcard StepIsDefinite(0,0) = true, want false")
+	}
+	if wild.IsPatternGuaranteedAtStep(0, 0) {
+		t.Fatal("wildcard IsPatternGuaranteedAtStep(0,0) = true, want false")
+	}
+}
+
 // --------------------------------------------------------------------------
 // Matching engine tests
 // --------------------------------------------------------------------------
