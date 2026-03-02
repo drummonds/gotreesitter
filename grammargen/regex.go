@@ -252,10 +252,12 @@ func (p *regexParser) parseCharClass() (*regexNode, error) {
 		}
 		first = false
 
-		// Special case: \p{...} or \P{...} inside character class — expands to multiple ranges.
+		// Special case: shorthand classes and \p{...}/\P{...} inside character class —
+		// these expand to multiple ranges and can't be handled by parseCharClassChar.
 		if r == '\\' && p.pos+1 < len(p.input) {
-			next := p.input[p.pos+1]
-			if next == 'p' || next == 'P' {
+			next := rune(p.input[p.pos+1])
+			switch next {
+			case 'p', 'P':
 				p.advance() // consume '\\'
 				p.advance() // consume 'p'/'P'
 				propRanges, err := p.parseUnicodeProperty()
@@ -263,6 +265,21 @@ func (p *regexParser) parseCharClass() (*regexNode, error) {
 					return nil, err
 				}
 				ranges = append(ranges, propRanges...)
+				continue
+			case 's': // \s → whitespace chars
+				p.advance() // consume '\\'
+				p.advance() // consume 's'
+				ranges = append(ranges, runeRange{' ', ' '}, runeRange{'\t', '\t'}, runeRange{'\n', '\n'}, runeRange{'\r', '\r'}, runeRange{'\f', '\f'}, runeRange{'\v', '\v'})
+				continue
+			case 'd': // \d → digits
+				p.advance()
+				p.advance()
+				ranges = append(ranges, runeRange{'0', '9'})
+				continue
+			case 'w': // \w → word chars
+				p.advance()
+				p.advance()
+				ranges = append(ranges, runeRange{'a', 'z'}, runeRange{'A', 'Z'}, runeRange{'0', '9'}, runeRange{'_', '_'})
 				continue
 			}
 		}

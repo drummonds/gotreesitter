@@ -1108,7 +1108,7 @@ var importParityGrammars = []importParityGrammar{
 			"",
 			"# first\n# second\n",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 3,
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 4,
 	},
 	{
 		name: "nix", jsonPath: "/tmp/grammar_parity/nix/src/grammar.json",
@@ -1250,7 +1250,7 @@ var importParityGrammars = []importParityGrammar{
 			"[remote \"origin\"]\n\turl = https://github.com/foo/bar\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n",
 			"# global config\n[alias]\n\tco = checkout\n\tst = status\n",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 4,
 	},
 	{
 		name: "forth", jsonPath: "/tmp/grammar_parity/forth/src/grammar.json",
@@ -1274,7 +1274,7 @@ var importParityGrammars = []importParityGrammar{
 			`{ nested = { x = 1 } }`,
 			`{ arr = [ 1 2 3 ] }`,
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 4,
 	},
 	{
 		name: "cpon", jsonPath: "/tmp/grammar_parity/cpon/src/grammar.json",
