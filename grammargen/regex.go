@@ -520,8 +520,24 @@ func rangeTableToRuneRanges(table *unicode.RangeTable) []runeRange {
 	return ranges
 }
 
-// parseUnicodeEscape parses \uXXXX.
+// parseUnicodeEscape parses \uXXXX or \u{XXXX} (variable-length braced form).
 func (p *regexParser) parseUnicodeEscape() (rune, error) {
+	// Check for braced form: \u{XXXX}
+	if p.pos < len(p.input) && p.input[p.pos] == '{' {
+		p.pos++ // consume '{'
+		end := strings.IndexByte(p.input[p.pos:], '}')
+		if end < 0 {
+			return 0, fmt.Errorf("unterminated \\u{...} escape")
+		}
+		hex := p.input[p.pos : p.pos+end]
+		p.pos += end + 1 // consume hex digits and '}'
+		n, err := strconv.ParseUint(hex, 16, 32)
+		if err != nil {
+			return 0, fmt.Errorf("invalid \\u escape: {%s}", hex)
+		}
+		return rune(n), nil
+	}
+	// Standard form: \uXXXX (exactly 4 hex digits)
 	if p.pos+4 > len(p.input) {
 		return 0, fmt.Errorf("incomplete \\u escape")
 	}
