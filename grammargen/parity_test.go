@@ -898,7 +898,7 @@ var importParityGrammars = []importParityGrammar{
 			`{}`, `{"key": "value"}`,
 			`{a: 1}`,
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 13, expectParity: 12,
+		expectImport: true, expectGenerate: true, expectNoErrors: 13, expectParity: 13,
 	},
 	{
 		name: "diff", jsonPath: "/tmp/grammar_parity/diff/src/grammar.json",
@@ -941,7 +941,7 @@ var importParityGrammars = []importParityGrammar{
 			"graph G { a -- b; b -- c; }",
 			"digraph { node [shape=box]; a -> b [label=\"edge\"]; }",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 4,
 	},
 }
 

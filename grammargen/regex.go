@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -250,6 +251,22 @@ func (p *regexParser) parseCharClass() (*regexNode, error) {
 			break
 		}
 		first = false
+
+		// Special case: \p{...} or \P{...} inside character class — expands to multiple ranges.
+		if r == '\\' && p.pos+1 < len(p.input) {
+			next := p.input[p.pos+1]
+			if next == 'p' || next == 'P' {
+				p.advance() // consume '\\'
+				p.advance() // consume 'p'/'P'
+				propRanges, err := p.parseUnicodeProperty()
+				if err != nil {
+					return nil, err
+				}
+				ranges = append(ranges, propRanges...)
+				continue
+			}
+		}
+
 		ch, err := p.parseCharClassChar()
 		if err != nil {
 			return nil, err
@@ -322,6 +339,20 @@ func (p *regexParser) parseEscape() (*regexNode, error) {
 		return &regexNode{kind: regexCharClass, runes: []runeRange{
 			{' ', ' '}, {'\t', '\t'}, {'\n', '\n'}, {'\r', '\r'}, {'\f', '\f'}, {'\v', '\v'},
 		}, negate: true}, nil
+	case 'p': // \p{PropertyName} — Unicode property (positive)
+		p.advance()
+		ranges, err := p.parseUnicodeProperty()
+		if err != nil {
+			return nil, err
+		}
+		return &regexNode{kind: regexCharClass, runes: ranges}, nil
+	case 'P': // \P{PropertyName} — Unicode property (negated)
+		p.advance()
+		ranges, err := p.parseUnicodeProperty()
+		if err != nil {
+			return nil, err
+		}
+		return &regexNode{kind: regexCharClass, runes: ranges, negate: true}, nil
 	}
 	ch, err := p.parseEscapeChar()
 	if err != nil {
@@ -357,6 +388,136 @@ func (p *regexParser) parseEscapeChar() (rune, error) {
 	default:
 		return r, nil
 	}
+}
+
+// parseUnicodeProperty parses \p{PropertyName} or \P{PropertyName}.
+// Expects the 'p'/'P' to have already been consumed.
+func (p *regexParser) parseUnicodeProperty() ([]runeRange, error) {
+	r, ok := p.peek()
+	if !ok || r != '{' {
+		return nil, fmt.Errorf("expected '{' after \\p")
+	}
+	p.advance() // consume '{'
+
+	start := p.pos
+	for {
+		r, ok := p.peek()
+		if !ok {
+			return nil, fmt.Errorf("unterminated \\p{...}")
+		}
+		if r == '}' {
+			break
+		}
+		p.advance()
+	}
+	propName := p.input[start:p.pos]
+	p.advance() // consume '}'
+
+	return unicodePropertyRanges(propName)
+}
+
+// unicodePropertyRanges returns rune ranges for a Unicode property name.
+// Uses Go's unicode package for accurate ranges.
+func unicodePropertyRanges(name string) ([]runeRange, error) {
+	var table *unicode.RangeTable
+	switch name {
+	case "L", "Letter":
+		table = unicode.Letter
+	case "Lu", "Uppercase_Letter":
+		table = unicode.Lu
+	case "Ll", "Lowercase_Letter":
+		table = unicode.Ll
+	case "Lt", "Titlecase_Letter":
+		table = unicode.Lt
+	case "Lm", "Modifier_Letter":
+		table = unicode.Lm
+	case "Lo", "Other_Letter":
+		table = unicode.Lo
+	case "N", "Number":
+		table = unicode.Number
+	case "Nd", "Decimal_Number", "Decimal_Digit":
+		table = unicode.Nd
+	case "Nl", "Letter_Number":
+		table = unicode.Nl
+	case "No", "Other_Number":
+		table = unicode.No
+	case "P", "Punctuation":
+		table = unicode.Punct
+	case "S", "Symbol":
+		table = unicode.Symbol
+	case "Z", "Separator":
+		table = unicode.Z
+	case "Zs", "Space_Separator":
+		table = unicode.Zs
+	case "M", "Mark":
+		table = unicode.Mark
+	case "Mn", "Nonspacing_Mark":
+		table = unicode.Mn
+	case "Mc", "Spacing_Mark":
+		table = unicode.Mc
+	case "Sm", "Math_Symbol":
+		table = unicode.Sm
+	case "So", "Other_Symbol":
+		table = unicode.So
+	case "Sk", "Modifier_Symbol":
+		table = unicode.Sk
+	case "Sc", "Currency_Symbol":
+		table = unicode.Sc
+	case "Pc", "Connector_Punctuation":
+		table = unicode.Pc
+	case "Cc", "Control":
+		table = unicode.Cc
+	case "Cf", "Format":
+		table = unicode.Cf
+	case "XID_Start":
+		// Approximation: Letter ∪ Nl (covers the vast majority of XID_Start)
+		ranges := rangeTableToRuneRanges(unicode.Letter)
+		ranges = append(ranges, rangeTableToRuneRanges(unicode.Nl)...)
+		return ranges, nil
+	case "XID_Continue":
+		// Approximation: Letter ∪ Nl ∪ Mn ∪ Mc ∪ Nd ∪ Pc
+		ranges := rangeTableToRuneRanges(unicode.Letter)
+		ranges = append(ranges, rangeTableToRuneRanges(unicode.Nl)...)
+		ranges = append(ranges, rangeTableToRuneRanges(unicode.Mn)...)
+		ranges = append(ranges, rangeTableToRuneRanges(unicode.Mc)...)
+		ranges = append(ranges, rangeTableToRuneRanges(unicode.Nd)...)
+		ranges = append(ranges, rangeTableToRuneRanges(unicode.Pc)...)
+		return ranges, nil
+	default:
+		return nil, fmt.Errorf("unsupported Unicode property %q", name)
+	}
+
+	return rangeTableToRuneRanges(table), nil
+}
+
+// rangeTableToRuneRanges converts a unicode.RangeTable to runeRange slices.
+func rangeTableToRuneRanges(table *unicode.RangeTable) []runeRange {
+	var ranges []runeRange
+	for _, r16 := range table.R16 {
+		lo := rune(r16.Lo)
+		hi := rune(r16.Hi)
+		stride := rune(r16.Stride)
+		if stride == 1 {
+			ranges = append(ranges, runeRange{lo, hi})
+		} else {
+			for c := lo; c <= hi; c += stride {
+				ranges = append(ranges, runeRange{c, c})
+			}
+		}
+	}
+	for _, r32 := range table.R32 {
+		lo := rune(r32.Lo)
+		hi := rune(r32.Hi)
+		stride := rune(r32.Stride)
+		if stride == 1 {
+			ranges = append(ranges, runeRange{lo, hi})
+		} else {
+			for c := lo; c <= hi; c += stride {
+				ranges = append(ranges, runeRange{c, c})
+			}
+		}
+	}
+	return ranges
 }
 
 // parseUnicodeEscape parses \uXXXX.
