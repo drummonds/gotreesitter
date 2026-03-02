@@ -884,8 +884,8 @@ var importParityGrammars = []importParityGrammar{
 			"val x = 1",
 			"object Main { def main(args: Array[String]): Unit = {} }",
 		},
-		// 208 rules — imports but too large for LR generation in 30s.
-		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+		genTimeout: 45 * time.Second,
+		expectImport: true, expectGenerate: true, expectNoErrors: 0, expectParity: 0,
 	},
 	// ── grammar.json imports (canonical resolved form) ──
 	{
@@ -1339,8 +1339,7 @@ var importParityGrammars = []importParityGrammar{
 			"clean:\n\trm -f *.o\n",
 			".PHONY: all clean\n",
 		},
-		// 65 rules — too slow for current LR generation
-		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 0,
 	},
 }
 

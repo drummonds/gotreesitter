@@ -16,6 +16,7 @@ type lrItem struct {
 type lrItemSet struct {
 	items []lrItem
 	key   string // canonical key for dedup
+	seen  map[closureItemKey]bool // persistent membership set for fast merge
 }
 
 // lrAction is a parse table action.
@@ -50,6 +51,7 @@ func buildLRTables(ng *NormalizedGrammar) (*LRTables, error) {
 		firstSets:  make(map[int]map[int]bool),
 		nullables:  make(map[int]bool),
 		prodsByLHS: make(map[int][]int),
+		betaCache:  make(map[struct{ prodIdx, dot int }]*betaResult),
 	}
 
 	// Build production-by-LHS index for fast closure lookups.
@@ -77,14 +79,17 @@ func buildLRTables(ng *NormalizedGrammar) (*LRTables, error) {
 		tables.ActionTable[stateIdx] = make(map[int][]lrAction)
 		tables.GotoTable[stateIdx] = make(map[int]int)
 
+		// Use pre-computed transitions instead of recomputing gotoState.
+		trans := ctx.transitions[stateIdx]
+
 		for _, item := range itemSet.items {
 			prod := &ng.Productions[item.prodIdx]
 
 			if item.dot < len(prod.RHS) {
 				// Dot not at end → shift or goto
 				nextSym := prod.RHS[item.dot]
-				targetState := ctx.gotoState(itemSet, nextSym)
-				if targetState < 0 {
+				targetState, ok := trans[nextSym]
+				if !ok {
 					continue
 				}
 
@@ -151,10 +156,17 @@ type lrContext struct {
 	// Production index: LHS symbol → production indices
 	prodsByLHS map[int][]int
 
+	// FIRST(β) cache: (prodIdx, dot) → first set + nullable flag
+	betaCache map[struct{ prodIdx, dot int }]*betaResult
+
 	// Item set management
 	itemSets   []lrItemSet
 	itemSetMap map[string]int // full LR(1) key → index
 	coreMap    map[string]int // core key (prodIdx+dot only) → index
+
+	// Transition cache: transitions[state][symbol] → target state
+	// Populated during buildItemSets, used during table construction.
+	transitions map[int]map[int]int
 }
 
 // computeFirstSets computes FIRST sets for all symbols.
@@ -231,121 +243,219 @@ func (ctx *lrContext) firstOfSequence(syms []int) map[int]bool {
 	return result
 }
 
-// closure computes the closure of an LR(1) item set.
-func (ctx *lrContext) closure(items []lrItem) []lrItem {
+// closureItemKey is the identity of an LR(1) item.
+type closureItemKey struct {
+	prodIdx, dot, lookahead int
+}
+
+// coreItem identifies an LR(0) core (production + dot position).
+type coreItem struct {
+	prodIdx, dot int
+}
+
+// closureToSet computes the closure of items and returns an lrItemSet with a
+// persistent seen map. Uses core-based closure: items sharing the same
+// (prodIdx, dot) core are grouped, and lookaheads are propagated as sets.
+// This is dramatically faster for grammars with many lookaheads per core.
+func (ctx *lrContext) closureToSet(items []lrItem) lrItemSet {
 	ng := ctx.ng
 	tokenCount := ng.TokenCount()
 
-	// Use a set to track items.
-	type itemKey struct {
-		prodIdx, dot, lookahead int
-	}
-	seen := make(map[itemKey]bool)
+	// Group input items by core, collecting lookahead sets.
+	cores := make(map[coreItem]map[int]bool)
+	var coreOrder []coreItem
 	for _, item := range items {
-		seen[itemKey{item.prodIdx, item.dot, item.lookahead}] = true
+		c := coreItem{item.prodIdx, item.dot}
+		if cores[c] == nil {
+			cores[c] = make(map[int]bool)
+			coreOrder = append(coreOrder, c)
+		}
+		cores[c][item.lookahead] = true
 	}
 
-	// Cache FIRST(β) for each (prodIdx, dot) pair — many items share the same
-	// suffix and only differ in lookahead.
-	type betaKey struct{ prodIdx, dot int }
-	type betaResult struct {
-		first    map[int]bool
-		nullable bool
+	// Worklist of cores that need (re-)processing. A core needs processing
+	// when it gains new lookaheads that might propagate through nullable suffixes.
+	inWorklist := make(map[coreItem]bool, len(coreOrder))
+	worklist := make([]coreItem, len(coreOrder))
+	copy(worklist, coreOrder)
+	for _, c := range coreOrder {
+		inWorklist[c] = true
 	}
-	betaCache := make(map[betaKey]*betaResult)
-
-	getBetaFirst := func(item lrItem) *betaResult {
-		bk := betaKey{item.prodIdx, item.dot}
-		if cached, ok := betaCache[bk]; ok {
-			return cached
-		}
-		prod := &ng.Productions[item.prodIdx]
-		beta := prod.RHS[item.dot+1:]
-		result := &betaResult{
-			first:    ctx.firstOfSequence(beta),
-			nullable: true,
-		}
-		for _, sym := range beta {
-			if sym < tokenCount || !ctx.nullables[sym] {
-				result.nullable = false
-				break
-			}
-		}
-		betaCache[bk] = result
-		return result
-	}
-
-	worklist := make([]lrItem, len(items))
-	copy(worklist, items)
 
 	for len(worklist) > 0 {
-		item := worklist[0]
+		c := worklist[0]
 		worklist = worklist[1:]
+		inWorklist[c] = false
 
-		prod := &ng.Productions[item.prodIdx]
-		if item.dot >= len(prod.RHS) {
+		prod := &ng.Productions[c.prodIdx]
+		if c.dot >= len(prod.RHS) {
 			continue
 		}
 
-		nextSym := prod.RHS[item.dot]
+		nextSym := prod.RHS[c.dot]
 		if nextSym < tokenCount {
-			continue // terminal — no closure needed
+			continue
 		}
 
-		// Compute FIRST(β a) where β = prod.RHS[dot+1:] and a = lookahead.
-		br := getBetaFirst(item)
+		br := ctx.getBetaFirst(lrItem{prodIdx: c.prodIdx, dot: c.dot})
+		las := cores[c]
 
-		// For each production B → γ, add [B → .γ, b] for b ∈ FIRST(βa).
 		for _, prodIdx := range ctx.prodsByLHS[nextSym] {
+			target := coreItem{prodIdx, 0}
+			targetLas := cores[target]
+			isNew := targetLas == nil
+			if isNew {
+				targetLas = make(map[int]bool)
+				cores[target] = targetLas
+				coreOrder = append(coreOrder, target)
+			}
+
+			addedNew := false
+			// FIRST(β) lookaheads — same for all source lookaheads.
 			for la := range br.first {
-				key := itemKey{prodIdx, 0, la}
-				if !seen[key] {
-					seen[key] = true
-					newItem := lrItem{prodIdx: prodIdx, dot: 0, lookahead: la}
-					items = append(items, newItem)
-					worklist = append(worklist, newItem)
+				if !targetLas[la] {
+					targetLas[la] = true
+					addedNew = true
 				}
 			}
-			// If β can derive ε, the lookahead propagates.
+			// If β is nullable, propagate all source lookaheads.
 			if br.nullable {
-				key := itemKey{prodIdx, 0, item.lookahead}
-				if !seen[key] {
-					seen[key] = true
-					newItem := lrItem{prodIdx: prodIdx, dot: 0, lookahead: item.lookahead}
-					items = append(items, newItem)
-					worklist = append(worklist, newItem)
+				for la := range las {
+					if !targetLas[la] {
+						targetLas[la] = true
+						addedNew = true
+					}
 				}
+			}
+			// Re-process target if it gained new lookaheads and could propagate.
+			if addedNew && !inWorklist[target] {
+				worklist = append(worklist, target)
+				inWorklist[target] = true
 			}
 		}
 	}
 
-	return items
+	// Expand core→lookaheadSet into individual items.
+	totalItems := 0
+	for _, c := range coreOrder {
+		totalItems += len(cores[c])
+	}
+	result := make([]lrItem, 0, totalItems)
+	seen := make(map[closureItemKey]bool, totalItems)
+	for _, c := range coreOrder {
+		for la := range cores[c] {
+			result = append(result, lrItem{prodIdx: c.prodIdx, dot: c.dot, lookahead: la})
+			seen[closureItemKey{c.prodIdx, c.dot, la}] = true
+		}
+	}
+
+	return lrItemSet{items: result, seen: seen}
 }
 
-// gotoState computes the GOTO of an item set for a given symbol.
-// Returns the target state index, or -1 if no transition.
-func (ctx *lrContext) gotoState(set lrItemSet, sym int) int {
-	var advanced []lrItem
-	for _, item := range set.items {
-		prod := &ctx.ng.Productions[item.prodIdx]
-		if item.dot < len(prod.RHS) && prod.RHS[item.dot] == sym {
-			advanced = append(advanced, lrItem{
-				prodIdx:   item.prodIdx,
-				dot:       item.dot + 1,
-				lookahead: item.lookahead,
-			})
+// closureIncremental propagates new items through an existing (already-closed)
+// item set. Uses core-based processing for efficiency.
+func (ctx *lrContext) closureIncremental(set *lrItemSet, newItems []lrItem) {
+	ng := ctx.ng
+	tokenCount := ng.TokenCount()
+
+	// Group new items by core.
+	cores := make(map[coreItem]map[int]bool)
+	var worklist []coreItem
+	inWorklist := make(map[coreItem]bool)
+
+	for _, item := range newItems {
+		c := coreItem{item.prodIdx, item.dot}
+		if cores[c] == nil {
+			cores[c] = make(map[int]bool)
+			worklist = append(worklist, c)
+			inWorklist[c] = true
 		}
-	}
-	if len(advanced) == 0 {
-		return -1
+		cores[c][item.lookahead] = true
 	}
 
-	closed := ctx.closure(advanced)
-	core := coreKey(closed)
-	if idx, ok := ctx.coreMap[core]; ok {
-		return idx
+	for len(worklist) > 0 {
+		c := worklist[0]
+		worklist = worklist[1:]
+		inWorklist[c] = false
+
+		prod := &ng.Productions[c.prodIdx]
+		if c.dot >= len(prod.RHS) {
+			continue
+		}
+
+		nextSym := prod.RHS[c.dot]
+		if nextSym < tokenCount {
+			continue
+		}
+
+		br := ctx.getBetaFirst(lrItem{prodIdx: c.prodIdx, dot: c.dot})
+		las := cores[c]
+
+		for _, prodIdx := range ctx.prodsByLHS[nextSym] {
+			target := coreItem{prodIdx, 0}
+			targetLas := cores[target]
+			if targetLas == nil {
+				targetLas = make(map[int]bool)
+				cores[target] = targetLas
+			}
+
+			addedNew := false
+			for la := range br.first {
+				key := closureItemKey{prodIdx, 0, la}
+				if !set.seen[key] {
+					set.seen[key] = true
+					targetLas[la] = true
+					set.items = append(set.items, lrItem{prodIdx: prodIdx, dot: 0, lookahead: la})
+					addedNew = true
+				}
+			}
+			if br.nullable {
+				for la := range las {
+					key := closureItemKey{prodIdx, 0, la}
+					if !set.seen[key] {
+						set.seen[key] = true
+						targetLas[la] = true
+						set.items = append(set.items, lrItem{prodIdx: prodIdx, dot: 0, lookahead: la})
+						addedNew = true
+					}
+				}
+			}
+			if addedNew && !inWorklist[target] {
+				worklist = append(worklist, target)
+				inWorklist[target] = true
+			}
+		}
 	}
-	return -1
+}
+
+// betaResult caches the FIRST set and nullability of a production suffix.
+type betaResult struct {
+	first    map[int]bool
+	nullable bool
+}
+
+// getBetaFirst returns the cached FIRST(β) for the suffix after the dot in an item.
+func (ctx *lrContext) getBetaFirst(item lrItem) *betaResult {
+	bk := struct{ prodIdx, dot int }{item.prodIdx, item.dot}
+	if cached, ok := ctx.betaCache[bk]; ok {
+		return cached
+	}
+	ng := ctx.ng
+	tokenCount := ng.TokenCount()
+	prod := &ng.Productions[item.prodIdx]
+	beta := prod.RHS[item.dot+1:]
+	result := &betaResult{
+		first:    ctx.firstOfSequence(beta),
+		nullable: true,
+	}
+	for _, sym := range beta {
+		if sym < tokenCount || !ctx.nullables[sym] {
+			result.nullable = false
+			break
+		}
+	}
+	ctx.betaCache[bk] = result
+	return result
 }
 
 // buildItemSets constructs LALR(1) item sets using core-based merging.
@@ -354,18 +464,18 @@ func (ctx *lrContext) gotoState(set lrItemSet, sym int) int {
 func (ctx *lrContext) buildItemSets() []lrItemSet {
 	ctx.itemSetMap = make(map[string]int)
 	ctx.coreMap = make(map[string]int)
+	ctx.transitions = make(map[int]map[int]int)
 
 	// Initial item set: closure of [S' → .S, $end]
-	initial := ctx.closure([]lrItem{{
+	initialSet := ctx.closureToSet([]lrItem{{
 		prodIdx:   ctx.ng.AugmentProdID,
 		dot:       0,
 		lookahead: 0, // $end
 	}})
-
-	initialKey := itemSetKey(initial)
-	initialCore := coreKey(initial)
-	ctx.itemSets = []lrItemSet{{items: initial, key: initialKey}}
-	ctx.itemSetMap[initialKey] = 0
+	initialSet.key = itemSetKey(initialSet.items)
+	initialCore := coreKey(initialSet.items)
+	ctx.itemSets = []lrItemSet{initialSet}
+	ctx.itemSetMap[initialSet.key] = 0
 	ctx.coreMap[initialCore] = 0
 
 	worklist := []int{0}
@@ -408,15 +518,18 @@ func (ctx *lrContext) buildItemSets() []lrItemSet {
 				continue
 			}
 
-			closed := ctx.closure(advanced)
-			core := coreKey(closed)
+			closedSet := ctx.closureToSet(advanced)
+			core := coreKey(closedSet.items)
 
+			var targetIdx int
 			if existingIdx, exists := ctx.coreMap[core]; exists {
+				targetIdx = existingIdx
 				// LALR merge: add any new lookaheads to the existing state.
-				if merged := mergeItems(&ctx.itemSets[existingIdx], closed); merged {
-					// Re-close the merged state to propagate new lookaheads.
-					ctx.itemSets[existingIdx].items = ctx.closure(ctx.itemSets[existingIdx].items)
-					// Re-process this state since items changed.
+				newItems := mergeItemsReturnNew(&ctx.itemSets[existingIdx], closedSet.items)
+				if len(newItems) > 0 {
+					// Incremental closure: only propagate the newly-added items
+					// through the existing state's persistent seen set.
+					ctx.closureIncremental(&ctx.itemSets[existingIdx], newItems)
 					if !inWorklist[existingIdx] {
 						worklist = append(worklist, existingIdx)
 						inWorklist[existingIdx] = true
@@ -424,38 +537,38 @@ func (ctx *lrContext) buildItemSets() []lrItemSet {
 				}
 			} else {
 				// New core — create a new state.
-				newIdx := len(ctx.itemSets)
-				key := itemSetKey(closed)
-				ctx.itemSetMap[key] = newIdx
-				ctx.coreMap[core] = newIdx
-				ctx.itemSets = append(ctx.itemSets, lrItemSet{items: closed, key: key})
-				worklist = append(worklist, newIdx)
-				inWorklist[newIdx] = true
+				targetIdx = len(ctx.itemSets)
+				closedSet.key = itemSetKey(closedSet.items)
+				ctx.itemSetMap[closedSet.key] = targetIdx
+				ctx.coreMap[core] = targetIdx
+				ctx.itemSets = append(ctx.itemSets, closedSet)
+				worklist = append(worklist, targetIdx)
+				inWorklist[targetIdx] = true
 			}
+			// Record transition for table construction.
+			if ctx.transitions[stateIdx] == nil {
+				ctx.transitions[stateIdx] = make(map[int]int)
+			}
+			ctx.transitions[stateIdx][sym] = targetIdx
 		}
 	}
 
 	return ctx.itemSets
 }
 
-// mergeItems adds items from src into dst, returning true if any new items were added.
-func mergeItems(dst *lrItemSet, src []lrItem) bool {
-	type itemKey struct{ prodIdx, dot, lookahead int }
-	existing := make(map[itemKey]bool, len(dst.items))
-	for _, item := range dst.items {
-		existing[itemKey{item.prodIdx, item.dot, item.lookahead}] = true
-	}
-
-	added := false
+// mergeItemsReturnNew adds items from src into dst using dst's persistent seen
+// set, returning only the newly-added items.
+func mergeItemsReturnNew(dst *lrItemSet, src []lrItem) []lrItem {
+	var newItems []lrItem
 	for _, item := range src {
-		k := itemKey{item.prodIdx, item.dot, item.lookahead}
-		if !existing[k] {
+		k := closureItemKey{item.prodIdx, item.dot, item.lookahead}
+		if !dst.seen[k] {
+			dst.seen[k] = true
 			dst.items = append(dst.items, item)
-			existing[k] = true
-			added = true
+			newItems = append(newItems, item)
 		}
 	}
-	return added
+	return newItems
 }
 
 // coreKey computes a key from only the (prodIdx, dot) pairs, ignoring lookaheads.

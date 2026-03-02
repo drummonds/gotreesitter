@@ -582,6 +582,7 @@ func prepareRule(r *Rule, parentName string, st *symbolTable, auxRules map[strin
 		// optional(x) → choice(x, blank)
 		inner := prepareRule(r.Children[0], parentName, st, auxRules, counter)
 		return Choice(inner, Blank())
+
 	}
 
 	// Recurse into children.
@@ -1150,18 +1151,24 @@ func expandInlineRules(g *Grammar) *Grammar {
 	}
 
 	// Build lookup for inline rule bodies.
+	// Skip inlining rules with many Choice alternatives (>4) — these cause
+	// a Cartesian product explosion during production extraction when they
+	// appear in sequences (e.g., 6^3 = 216 alternatives from a 6-way choice
+	// inlined at 3 positions). Keep such rules as hidden nonterminals instead.
 	inlineBodies := make(map[string]*Rule)
 	for _, name := range g.Inline {
 		if rule, ok := g.Rules[name]; ok {
-			inlineBodies[name] = rule
+			if choiceWidth(rule) <= 4 {
+				inlineBodies[name] = rule
+			}
 		}
 	}
 
-	// Create a new grammar without the inline rules.
+	// Create a new grammar without the successfully-inlined rules.
 	out := NewGrammar(g.Name)
 	for _, name := range g.RuleOrder {
-		if inlineSet[name] {
-			continue // drop inline rules
+		if inlineSet[name] && inlineBodies[name] != nil {
+			continue // drop inlined rules
 		}
 		out.Define(name, substituteInlineRefs(g.Rules[name], inlineBodies))
 	}
@@ -1179,6 +1186,26 @@ func expandInlineRules(g *Grammar) *Grammar {
 	// Don't propagate Inline — they've been expanded.
 
 	return out
+}
+
+// choiceWidth returns the number of top-level Choice alternatives in a rule.
+// For non-Choice rules, returns 1.
+func choiceWidth(r *Rule) int {
+	if r == nil {
+		return 1
+	}
+	// Unwrap precedence wrappers.
+	for r.Kind == RulePrec || r.Kind == RulePrecLeft || r.Kind == RulePrecRight || r.Kind == RulePrecDynamic {
+		if len(r.Children) > 0 {
+			r = r.Children[0]
+		} else {
+			return 1
+		}
+	}
+	if r.Kind == RuleChoice {
+		return len(r.Children)
+	}
+	return 1
 }
 
 // substituteInlineRefs replaces RuleSymbol references to inline rules with
