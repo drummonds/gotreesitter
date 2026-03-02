@@ -270,14 +270,42 @@ func (p *regexParser) parseCharClassChar() (rune, error) {
 // parseEscape parses an escape sequence.
 func (p *regexParser) parseEscape() (*regexNode, error) {
 	p.advance() // consume '\\'
+	// Check for shorthand character classes before consuming.
+	r, ok := p.peek()
+	if !ok {
+		return nil, fmt.Errorf("unexpected end after \\")
+	}
+	switch r {
+	case 'd': // \d → [0-9]
+		p.advance()
+		return &regexNode{kind: regexCharClass, runes: []runeRange{{'0', '9'}}}, nil
+	case 'D': // \D → [^0-9]
+		p.advance()
+		return &regexNode{kind: regexCharClass, runes: []runeRange{{'0', '9'}}, negate: true}, nil
+	case 'w': // \w → [a-zA-Z0-9_]
+		p.advance()
+		return &regexNode{kind: regexCharClass, runes: []runeRange{
+			{'a', 'z'}, {'A', 'Z'}, {'0', '9'}, {'_', '_'},
+		}}, nil
+	case 'W': // \W → [^a-zA-Z0-9_]
+		p.advance()
+		return &regexNode{kind: regexCharClass, runes: []runeRange{
+			{'a', 'z'}, {'A', 'Z'}, {'0', '9'}, {'_', '_'},
+		}, negate: true}, nil
+	case 's': // \s → [\t\n\r \f\v]
+		p.advance()
+		return &regexNode{kind: regexCharClass, runes: []runeRange{
+			{' ', ' '}, {'\t', '\t'}, {'\n', '\n'}, {'\r', '\r'}, {'\f', '\f'}, {'\v', '\v'},
+		}}, nil
+	case 'S': // \S → [^\t\n\r \f\v]
+		p.advance()
+		return &regexNode{kind: regexCharClass, runes: []runeRange{
+			{' ', ' '}, {'\t', '\t'}, {'\n', '\n'}, {'\r', '\r'}, {'\f', '\f'}, {'\v', '\v'},
+		}, negate: true}, nil
+	}
 	ch, err := p.parseEscapeChar()
 	if err != nil {
 		return nil, err
-	}
-	// Handle special escape classes
-	switch ch {
-	case -1: // \s, \d, \w → returned as char class
-		return nil, fmt.Errorf("internal error: escape class should be handled")
 	}
 	return &regexNode{kind: regexLiteral, value: ch}, nil
 }

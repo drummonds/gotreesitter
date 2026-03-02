@@ -1,6 +1,7 @@
 package grammargen
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -1925,5 +1926,211 @@ func TestParseGrammarFileList(t *testing.T) {
 	}
 	if strings.Count(sexp, "word") != 4 {
 		t.Errorf("expected 4 word nodes, got %d in: %s", strings.Count(sexp, "word"), sexp)
+	}
+}
+
+// ============================================================
+// Real-World Grammar.js Import & Parity
+// ============================================================
+
+func TestImportRealJSONGrammarJS(t *testing.T) {
+	const grammarJSPath = "/tmp/grammar_parity/json/grammar.js"
+	source, err := os.ReadFile(grammarJSPath)
+	if err != nil {
+		t.Skipf("skipping: %v (clone tree-sitter-json to %s)", err, grammarJSPath)
+	}
+
+	g, err := ImportGrammarJS(source)
+	if err != nil {
+		t.Fatalf("ImportGrammarJS failed: %v", err)
+	}
+
+	// Verify grammar name and key rules.
+	if g.Name != "json" {
+		t.Errorf("name = %q, want 'json'", g.Name)
+	}
+
+	expectedRules := []string{
+		"document", "_value", "object", "pair", "array", "string",
+		"_string_content", "string_content", "escape_sequence",
+		"number", "true", "false", "null", "comment",
+	}
+	for _, name := range expectedRules {
+		if _, ok := g.Rules[name]; !ok {
+			t.Errorf("missing rule %q", name)
+		}
+	}
+	t.Logf("imported %d rules, %d extras, %d supertypes",
+		len(g.Rules), len(g.Extras), len(g.Supertypes))
+
+	// Verify extras include whitespace and comment.
+	if len(g.Extras) != 2 {
+		t.Errorf("extras count = %d, want 2", len(g.Extras))
+	}
+
+	// Verify supertypes.
+	if len(g.Supertypes) != 1 || g.Supertypes[0] != "_value" {
+		t.Errorf("supertypes = %v, want [_value]", g.Supertypes)
+	}
+
+	// Generate Language from imported grammar.
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+	t.Logf("generated: %d symbols, %d states, %d tokens",
+		lang.SymbolCount, lang.StateCount, lang.TokenCount)
+
+	// Parse a representative set of JSON inputs.
+	inputs := []struct {
+		name  string
+		input string
+	}{
+		{"empty_object", `{}`},
+		{"simple_object", `{"a": 1}`},
+		{"nested_object", `{"a": {"b": 2}}`},
+		{"array", `[1, 2, 3]`},
+		{"string", `"hello world"`},
+		{"number_int", `42`},
+		{"number_float", `3.14`},
+		{"number_exp", `1e10`},
+		{"number_neg", `-5`},
+		{"true", `true`},
+		{"false", `false`},
+		{"null", `null`},
+		{"complex", `{"key": [1, true, null, "str", {"nested": []}]}`},
+	}
+
+	parser := gotreesitter.NewParser(lang)
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			tree, parseErr := parser.Parse([]byte(tc.input))
+			if parseErr != nil {
+				t.Fatalf("parse failed: %v", parseErr)
+			}
+			sexp := tree.RootNode().SExpr(lang)
+			if strings.Contains(sexp, "ERROR") || strings.Contains(sexp, "MISSING") {
+				t.Errorf("parse error in tree: %s", sexp)
+			}
+			t.Logf("%s → %s", tc.input, sexp)
+		})
+	}
+}
+
+func TestImportRealJSONParityWithBlob(t *testing.T) {
+	const grammarJSPath = "/tmp/grammar_parity/json/grammar.js"
+	source, err := os.ReadFile(grammarJSPath)
+	if err != nil {
+		t.Skipf("skipping: %v", err)
+	}
+
+	g, err := ImportGrammarJS(source)
+	if err != nil {
+		t.Fatalf("ImportGrammarJS: %v", err)
+	}
+
+	genLang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage: %v", err)
+	}
+
+	// Load the reference json.bin blob.
+	refLang := grammars.JsonLanguage()
+	if refLang == nil {
+		t.Fatal("could not load reference JSON language")
+	}
+
+	inputs := []string{
+		`{}`,
+		`{"a": 1}`,
+		`[1, 2, 3]`,
+		`"hello"`,
+		`42`,
+		`true`,
+		`null`,
+		`{"a": {"b": [1, null, "x"]}}`,
+		`{"key": "value", "arr": [1, 2.5, -3, true, false, null]}`,
+	}
+
+	genParser := gotreesitter.NewParser(genLang)
+	refParser := gotreesitter.NewParser(refLang)
+
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			genTree, err := genParser.Parse([]byte(input))
+			if err != nil {
+				t.Fatalf("gen parse: %v", err)
+			}
+			refTree, err := refParser.Parse([]byte(input))
+			if err != nil {
+				t.Fatalf("ref parse: %v", err)
+			}
+
+			genSexp := genTree.RootNode().SExpr(genLang)
+			refSexp := refTree.RootNode().SExpr(refLang)
+
+			if strings.Contains(genSexp, "ERROR") {
+				t.Errorf("gen tree has ERROR: %s", genSexp)
+			}
+
+			// Compare S-expressions (stripping whitespace differences).
+			if normalizeSexp(genSexp) != normalizeSexp(refSexp) {
+				t.Errorf("parity mismatch:\n  gen: %s\n  ref: %s", genSexp, refSexp)
+			}
+		})
+	}
+}
+
+// normalizeSexp normalizes an S-expression for comparison by collapsing whitespace.
+func normalizeSexp(s string) string {
+	s = strings.TrimSpace(s)
+	// Collapse multiple spaces to single.
+	for strings.Contains(s, "  ") {
+		s = strings.ReplaceAll(s, "  ", " ")
+	}
+	return s
+}
+
+func TestImportRealCSSGrammarJS(t *testing.T) {
+	const grammarJSPath = "/tmp/grammar_parity/css/grammar.js"
+	source, err := os.ReadFile(grammarJSPath)
+	if err != nil {
+		t.Skipf("skipping: %v (clone tree-sitter-css to %s)", err, grammarJSPath)
+	}
+
+	g, err := ImportGrammarJS(source)
+	if err != nil {
+		t.Fatalf("ImportGrammarJS failed: %v", err)
+	}
+
+	if g.Name != "css" {
+		t.Errorf("name = %q, want 'css'", g.Name)
+	}
+	t.Logf("imported %d rules, %d extras, %d externals, %d inline",
+		len(g.Rules), len(g.Extras), len(g.Externals), len(g.Inline))
+
+	// Verify key structural properties.
+	if len(g.Rules) < 50 {
+		t.Errorf("expected at least 50 rules, got %d", len(g.Rules))
+	}
+	if len(g.Extras) != 3 {
+		t.Errorf("extras = %d, want 3", len(g.Extras))
+	}
+	if len(g.Externals) != 3 {
+		t.Errorf("externals = %d, want 3", len(g.Externals))
+	}
+
+	// Verify key rules exist.
+	expectedRules := []string{
+		"stylesheet", "rule_set", "selectors", "block",
+		"declaration", "color_value",
+		"integer_value", "float_value", "string_value",
+		"class_selector", "id_selector", "pseudo_class_selector",
+		"import_statement", "media_statement", "comment",
+	}
+	for _, name := range expectedRules {
+		if _, ok := g.Rules[name]; !ok {
+			t.Errorf("missing rule %q", name)
+		}
 	}
 }

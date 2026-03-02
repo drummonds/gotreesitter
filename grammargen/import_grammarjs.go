@@ -30,8 +30,11 @@ func ImportGrammarJS(source []byte) (*Grammar, error) {
 }
 
 type jsImporter struct {
-	source []byte
-	lang   *gotreesitter.Language
+	source      []byte
+	lang        *gotreesitter.Language
+	helperFuncs map[string]*gotreesitter.Node // top-level function declarations (commaSep, etc.)
+	paramSubst  map[string]*Rule              // active parameter substitutions for helper inlining
+	localConsts map[string]*gotreesitter.Node  // local const declarations in current rule body
 }
 
 // nodeText returns the source text of a node.
@@ -47,6 +50,9 @@ func (imp *jsImporter) nodeType(n *gotreesitter.Node) string {
 // extract walks the AST to find module.exports = grammar({...}) and extracts
 // all grammar components.
 func (imp *jsImporter) extract(root *gotreesitter.Node) (*Grammar, error) {
+	// Collect top-level helper functions (commaSep, sep, etc.) before processing grammar.
+	imp.collectHelperFunctions(root)
+
 	grammarObj, err := imp.findGrammarCall(root)
 	if err != nil {
 		return nil, err
@@ -206,6 +212,7 @@ func (imp *jsImporter) extractRules(rulesObj *gotreesitter.Node, g *Grammar) err
 		}
 
 		rule, err := imp.convertRuleExpr(ruleExpr)
+		imp.localConsts = nil // clear per-rule local consts
 		if err != nil {
 			return fmt.Errorf("rule %q: %w", name, err)
 		}
@@ -244,12 +251,22 @@ func (imp *jsImporter) getMethodBody(n *gotreesitter.Node) *gotreesitter.Node {
 }
 
 // extractArrowBody extracts the body expression from an arrow function.
+// For block bodies (e.g. _ => { const x = ...; return expr; }), it collects
+// local const declarations and returns the return expression.
 func (imp *jsImporter) extractArrowBody(n *gotreesitter.Node) *gotreesitter.Node {
 	if n == nil {
 		return nil
 	}
 	if imp.nodeType(n) == "arrow_function" {
-		return n.ChildByFieldName("body", imp.lang)
+		body := n.ChildByFieldName("body", imp.lang)
+		if body != nil && imp.nodeType(body) == "statement_block" {
+			imp.collectLocalConsts(body)
+			ret := imp.findReturnExpr(body)
+			if ret != nil {
+				return ret
+			}
+		}
+		return body
 	}
 	return n
 }
@@ -281,6 +298,18 @@ func (imp *jsImporter) convertRuleExpr(n *gotreesitter.Node) (*Rule, error) {
 	case "identifier":
 		if text == "blank" {
 			return Blank(), nil
+		}
+		// Check parameter substitution (helper function inlining).
+		if imp.paramSubst != nil {
+			if r, ok := imp.paramSubst[text]; ok {
+				return r, nil
+			}
+		}
+		// Check local const declarations (block arrow bodies).
+		if imp.localConsts != nil {
+			if initNode, ok := imp.localConsts[text]; ok {
+				return imp.convertRuleExpr(initNode)
+			}
 		}
 		return Sym(text), nil
 
@@ -322,10 +351,14 @@ func (imp *jsImporter) convertCallExpr(n *gotreesitter.Node) (*Rule, error) {
 		}
 	}
 
-	// Collect arguments.
+	// Collect arguments, skipping comments.
 	var argNodes []*gotreesitter.Node
 	for i := 0; i < int(args.NamedChildCount()); i++ {
-		argNodes = append(argNodes, args.NamedChild(i))
+		child := args.NamedChild(i)
+		if imp.nodeType(child) == "comment" {
+			continue
+		}
+		argNodes = append(argNodes, child)
 	}
 
 	switch fnText {
@@ -447,6 +480,10 @@ func (imp *jsImporter) convertCallExpr(n *gotreesitter.Node) (*Rule, error) {
 		return Alias(child, aliasName, named), nil
 
 	default:
+		// Try inlining a locally-defined helper function.
+		if _, ok := imp.helperFuncs[fnText]; ok {
+			return imp.inlineHelperCall(fnText, argNodes)
+		}
 		return nil, fmt.Errorf("unsupported function call %q", fnText)
 	}
 }
@@ -635,4 +672,122 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// collectHelperFunctions scans the root for top-level function declarations
+// (like commaSep, commaSep1, sep, sep1) and stores them for inlining.
+func (imp *jsImporter) collectHelperFunctions(root *gotreesitter.Node) {
+	imp.helperFuncs = make(map[string]*gotreesitter.Node)
+	for i := 0; i < int(root.NamedChildCount()); i++ {
+		child := root.NamedChild(i)
+		if imp.nodeType(child) == "function_declaration" {
+			name := child.ChildByFieldName("name", imp.lang)
+			if name != nil {
+				imp.helperFuncs[imp.nodeText(name)] = child
+			}
+		}
+	}
+}
+
+// inlineHelperCall inlines a helper function call by substituting parameters.
+func (imp *jsImporter) inlineHelperCall(funcName string, argNodes []*gotreesitter.Node) (*Rule, error) {
+	funcNode := imp.helperFuncs[funcName]
+
+	// Get parameter names.
+	params := imp.getHelperParams(funcNode)
+
+	// Convert arguments using the current context.
+	args, err := imp.convertRuleArgs(argNodes)
+	if err != nil {
+		return nil, fmt.Errorf("helper %s args: %w", funcName, err)
+	}
+
+	// Save and set parameter substitutions.
+	oldSubst := imp.paramSubst
+	imp.paramSubst = make(map[string]*Rule)
+	// Carry forward existing substitutions for nested helpers.
+	for k, v := range oldSubst {
+		imp.paramSubst[k] = v
+	}
+	for i, p := range params {
+		if i < len(args) {
+			imp.paramSubst[p] = args[i]
+		}
+	}
+
+	// Get the function body's return expression.
+	body := imp.getHelperBody(funcNode)
+	if body == nil {
+		imp.paramSubst = oldSubst
+		return nil, fmt.Errorf("helper %s: could not find return expression", funcName)
+	}
+
+	result, err := imp.convertRuleExpr(body)
+
+	// Restore.
+	imp.paramSubst = oldSubst
+	return result, err
+}
+
+// getHelperParams extracts parameter names from a function_declaration.
+func (imp *jsImporter) getHelperParams(funcNode *gotreesitter.Node) []string {
+	params := funcNode.ChildByFieldName("parameters", imp.lang)
+	if params == nil {
+		return nil
+	}
+	var names []string
+	for i := 0; i < int(params.NamedChildCount()); i++ {
+		child := params.NamedChild(i)
+		names = append(names, imp.nodeText(child))
+	}
+	return names
+}
+
+// getHelperBody extracts the return expression from a function body.
+func (imp *jsImporter) getHelperBody(funcNode *gotreesitter.Node) *gotreesitter.Node {
+	body := funcNode.ChildByFieldName("body", imp.lang)
+	if body == nil {
+		return nil
+	}
+	return imp.findReturnExpr(body)
+}
+
+// findReturnExpr searches a statement_block for a return statement and returns
+// the returned expression node.
+func (imp *jsImporter) findReturnExpr(block *gotreesitter.Node) *gotreesitter.Node {
+	for i := 0; i < int(block.NamedChildCount()); i++ {
+		child := block.NamedChild(i)
+		if imp.nodeType(child) == "return_statement" {
+			if int(child.NamedChildCount()) > 0 {
+				return child.NamedChild(0)
+			}
+		}
+	}
+	return nil
+}
+
+// collectLocalConsts scans a statement_block for const/let/var declarations
+// and stores them in imp.localConsts for variable resolution during conversion.
+func (imp *jsImporter) collectLocalConsts(block *gotreesitter.Node) {
+	imp.localConsts = make(map[string]*gotreesitter.Node)
+	for i := 0; i < int(block.NamedChildCount()); i++ {
+		child := block.NamedChild(i)
+		typ := imp.nodeType(child)
+		if typ == "lexical_declaration" || typ == "variable_declaration" {
+			for j := 0; j < int(child.NamedChildCount()); j++ {
+				decl := child.NamedChild(j)
+				if imp.nodeType(decl) == "variable_declarator" {
+					// Use positional access: first named child is the name,
+					// second named child is the init value.
+					// (ChildByFieldName doesn't work for all grammar blobs.)
+					nc := int(decl.NamedChildCount())
+					if nc >= 2 {
+						name := decl.NamedChild(0)
+						value := decl.NamedChild(nc - 1)
+						imp.localConsts[imp.nodeText(name)] = value
+					}
+				}
+			}
+		}
+	}
 }
