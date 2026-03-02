@@ -15,7 +15,8 @@ type regexNode struct {
 	runes    []runeRange // for charClass
 	negate   bool        // for charClass
 	value    rune        // for literal
-	count    int         // for counted repetition {n}
+	count    int         // for counted repetition {n} min
+	countMax int         // for {n,m}: max (-1 = unbounded, 0 = same as count)
 }
 
 type regexKind int
@@ -139,36 +140,55 @@ func (p *regexParser) parseQuantified() (*regexNode, error) {
 		p.advance()
 		return &regexNode{kind: regexQuestion, children: []*regexNode{atom}}, nil
 	case '{':
-		n, err := p.parseCount()
+		min, max, err := p.parseCount()
 		if err != nil {
 			return nil, err
 		}
-		return &regexNode{kind: regexCount, children: []*regexNode{atom}, count: n}, nil
+		return &regexNode{kind: regexCount, children: []*regexNode{atom}, count: min, countMax: max}, nil
 	}
 	return atom, nil
 }
 
-// parseCount parses {n} counted repetition.
-func (p *regexParser) parseCount() (int, error) {
+// parseCount parses counted repetition: {n}, {n,m}, {n,}.
+// Returns (min, max) where max=-1 means unbounded.
+func (p *regexParser) parseCount() (int, int, error) {
 	p.advance() // consume '{'
 	start := p.pos
 	for {
 		r, ok := p.peek()
 		if !ok {
-			return 0, fmt.Errorf("unterminated {}")
+			return 0, 0, fmt.Errorf("unterminated {}")
 		}
 		if r == '}' {
 			break
 		}
 		p.advance()
 	}
-	numStr := p.input[start:p.pos]
+	content := p.input[start:p.pos]
 	p.advance() // consume '}'
-	n, err := strconv.Atoi(numStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid count in {%s}: %w", numStr, err)
+
+	if idx := strings.Index(content, ","); idx >= 0 {
+		minStr := content[:idx]
+		maxStr := content[idx+1:]
+		min, err := strconv.Atoi(strings.TrimSpace(minStr))
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid min in {%s}: %w", content, err)
+		}
+		if strings.TrimSpace(maxStr) == "" {
+			return min, -1, nil // {n,} — unbounded
+		}
+		max, err := strconv.Atoi(strings.TrimSpace(maxStr))
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid max in {%s}: %w", content, err)
+		}
+		return min, max, nil
 	}
-	return n, nil
+
+	n, err := strconv.Atoi(content)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid count in {%s}: %w", content, err)
+	}
+	return n, n, nil // {n} — exactly n
 }
 
 // parseAtom parses a single atom: literal, charclass, group, dot, escape.
@@ -394,12 +414,27 @@ func expandRegexToRule(node *regexNode) *Rule {
 		return Optional(expandRegexToRule(node.children[0]))
 	case regexCount:
 		inner := expandRegexToRule(node.children[0])
-		if node.count <= 0 {
+		min := node.count
+		max := node.countMax
+		if min <= 0 && max <= 0 {
 			return Blank()
 		}
-		parts := make([]*Rule, node.count)
-		for i := range parts {
+		if max == -1 {
+			// {n,} — n required + zero-or-more
+			parts := make([]*Rule, min+1)
+			for i := 0; i < min; i++ {
+				parts[i] = cloneRule(inner)
+			}
+			parts[min] = Repeat(cloneRule(inner))
+			return Seq(parts...)
+		}
+		// {n,m} or {n} — n required + (m-n) optional
+		parts := make([]*Rule, max)
+		for i := 0; i < min; i++ {
 			parts[i] = cloneRule(inner)
+		}
+		for i := min; i < max; i++ {
+			parts[i] = Optional(cloneRule(inner))
 		}
 		return Seq(parts...)
 	default:

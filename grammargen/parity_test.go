@@ -23,8 +23,10 @@ package grammargen
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/grammars"
@@ -765,6 +767,200 @@ func TestParityJSONBlobRoundTrip(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ── Multi-Grammar Import Pipeline Parity ─────────────────────────────────────
+//
+// Tests the full pipeline: grammar.js → ImportGrammarJS → GenerateLanguage →
+// parse → compare against reference .bin blob. Each grammar tracks metrics
+// at four stages:
+//   Stage 1 (import):   grammar.js → Grammar IR
+//   Stage 2 (generate): Grammar IR → Language
+//   Stage 3 (parse):    Language → parse samples without ERROR
+//   Stage 4 (parity):   S-expressions match reference blob exactly
+
+// importParityGrammar describes a real-world grammar to test against.
+type importParityGrammar struct {
+	name     string
+	path     string                            // path to grammar.js
+	blobFunc func() *gotreesitter.Language      // reference blob loader
+	samples  []string                           // representative parse inputs
+	// Expected pass counts at each stage (regression floor — can only increase).
+	expectImport   bool // import should succeed
+	expectGenerate bool // generate should succeed
+	expectNoErrors int  // minimum samples that parse without ERROR
+	expectParity   int  // minimum samples with exact S-expression match
+}
+
+var importParityGrammars = []importParityGrammar{
+	{
+		name: "json", path: "/tmp/grammar_parity/json/grammar.js",
+		blobFunc: grammars.JsonLanguage,
+		samples: []string{
+			`{}`, `{"a": 1}`, `[1, 2, 3]`, `"hello"`, `42`, `true`, `null`,
+			`{"a": {"b": [1, null, "x"]}}`,
+			`{"key": "value", "arr": [1, 2.5, -3, true, false, null]}`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 9, expectParity: 9,
+	},
+	{
+		name: "ini", path: "/tmp/grammar_parity/ini/grammar.js",
+		blobFunc: grammars.IniLanguage,
+		samples: []string{
+			"[section]\nkey=value",
+			"key = value",
+			"[main]\nhost = localhost\nport = 8080",
+			"; comment\n[section]",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+	},
+	{
+		name: "properties", path: "/tmp/grammar_parity/properties/grammar.js",
+		blobFunc: grammars.PropertiesLanguage,
+		samples: []string{
+			"key=value",
+			"key = value",
+			"# comment\nkey=value",
+			"key1=v1\nkey2=v2",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+	},
+	{
+		name: "requirements", path: "/tmp/grammar_parity/requirements/grammar.js",
+		blobFunc: grammars.RequirementsLanguage,
+		samples: []string{
+			"flask==2.0",
+			"numpy",
+			"requests>=2.0\nflask",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 0,
+	},
+	{
+		name: "jsdoc", path: "/tmp/grammar_parity/jsdoc/grammar.js",
+		blobFunc: grammars.JsdocLanguage,
+		samples: []string{
+			"@param {string} name",
+			"@returns {number}",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 2, expectParity: 0,
+	},
+	{
+		name: "css", path: "/tmp/grammar_parity/css/grammar.js",
+		blobFunc: grammars.CssLanguage,
+		samples: []string{
+			"body { color: red; }",
+			".class { margin: 0; }",
+		},
+		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+	},
+}
+
+// generateWithTimeout runs GenerateLanguage with a deadline. Returns nil, err
+// if the generation exceeds the timeout (e.g., LR table construction hangs).
+func generateWithTimeout(gram *Grammar, timeout time.Duration) (*gotreesitter.Language, error) {
+	type result struct {
+		lang *gotreesitter.Language
+		err  error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		lang, err := GenerateLanguage(gram)
+		ch <- result{lang, err}
+	}()
+	select {
+	case r := <-ch:
+		return r.lang, r.err
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("generation timed out after %v", timeout)
+	}
+}
+
+func TestMultiGrammarImportPipeline(t *testing.T) {
+	// Summary metrics.
+	var totalGrammars, importOK, generateOK, totalSamples, noErrorSamples, paritySamples int
+
+	for _, g := range importParityGrammars {
+		t.Run(g.name, func(t *testing.T) {
+			totalGrammars++
+			source, err := os.ReadFile(g.path)
+			if err != nil {
+				t.Skipf("grammar.js not available: %v (clone repos to /tmp/grammar_parity/)", err)
+				return
+			}
+
+			// Stage 1: Import
+			gram, err := ImportGrammarJS(source)
+			if err != nil {
+				if g.expectImport {
+					t.Errorf("REGRESSION: import should succeed but failed: %v", err)
+				} else {
+					t.Logf("import failed (expected): %v", err)
+				}
+				return
+			}
+			importOK++
+			t.Logf("import: %d rules, %d extras, %d externals", len(gram.Rules), len(gram.Extras), len(gram.Externals))
+
+			// Stage 2: Generate (with 30s timeout to avoid LR table hangs)
+			genLang, err := generateWithTimeout(gram, 30*time.Second)
+			if err != nil {
+				if g.expectGenerate {
+					t.Errorf("REGRESSION: generate should succeed but failed: %v", err)
+				} else {
+					t.Logf("generate failed (expected): %v", err)
+				}
+				return
+			}
+			generateOK++
+			t.Logf("generate: %d symbols, %d states, %d tokens",
+				genLang.SymbolCount, genLang.StateCount, genLang.TokenCount)
+
+			// Stage 3 + 4: Parse and compare
+			refLang := g.blobFunc()
+			genParser := gotreesitter.NewParser(genLang)
+			refParser := gotreesitter.NewParser(refLang)
+
+			noErrCount := 0
+			parityCount := 0
+
+			for _, sample := range g.samples {
+				totalSamples++
+				genTree, _ := genParser.Parse([]byte(sample))
+				refTree, _ := refParser.Parse([]byte(sample))
+
+				genSexp := genTree.RootNode().SExpr(genLang)
+				refSexp := refTree.RootNode().SExpr(refLang)
+
+				genHasError := strings.Contains(genSexp, "ERROR") || strings.Contains(genSexp, "MISSING")
+
+				if !genHasError {
+					noErrCount++
+					noErrorSamples++
+				}
+
+				if genSexp == refSexp {
+					parityCount++
+					paritySamples++
+				}
+			}
+
+			t.Logf("parse: %d/%d no-error, %d/%d parity",
+				noErrCount, len(g.samples), parityCount, len(g.samples))
+
+			// Regression gates: counts can only improve.
+			if noErrCount < g.expectNoErrors {
+				t.Errorf("REGRESSION: no-error count %d < floor %d", noErrCount, g.expectNoErrors)
+			}
+			if parityCount < g.expectParity {
+				t.Errorf("REGRESSION: parity count %d < floor %d", parityCount, g.expectParity)
+			}
+		})
+	}
+
+	// Log summary.
+	t.Logf("PIPELINE SUMMARY: %d/%d import, %d/%d generate, %d/%d no-error, %d/%d parity",
+		importOK, totalGrammars, generateOK, totalGrammars,
+		noErrorSamples, totalSamples, paritySamples, totalSamples)
 }
 
 // ── Parity: Validate + Generate coherence ───────────────────────────────────
