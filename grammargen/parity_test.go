@@ -938,7 +938,7 @@ var importParityGrammars = []importParityGrammar{
 			`mutation { createUser(name: "test") { id } }`,
 			`fragment F on User { name email }`,
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 4,
+		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 5,
 	},
 	{
 		name: "dot", jsonPath: "/tmp/grammar_parity/dot/src/grammar.json",

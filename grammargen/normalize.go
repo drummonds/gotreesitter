@@ -92,18 +92,20 @@ type NormalizedGrammar struct {
 
 // symbolTable is used during normalization.
 type symbolTable struct {
-	byName    map[string]int
-	symbols   []SymbolInfo
-	nextID    int
-	fieldMap  map[string]int
-	fields    []string
+	byName        map[string]int // terminal name → symbol ID
+	nontermByName map[string]int // nonterminal name → symbol ID
+	symbols       []SymbolInfo
+	nextID        int
+	fieldMap      map[string]int
+	fields        []string
 }
 
 func newSymbolTable() *symbolTable {
 	st := &symbolTable{
-		byName:   make(map[string]int),
-		fieldMap: make(map[string]int),
-		fields:   []string{""},  // index 0 is always ""
+		byName:        make(map[string]int),
+		nontermByName: make(map[string]int),
+		fieldMap:       make(map[string]int),
+		fields:         []string{""}, // index 0 is always ""
 	}
 	// Symbol 0 = "end" (EOF)
 	st.addSymbol("end", SymbolInfo{
@@ -116,10 +118,31 @@ func newSymbolTable() *symbolTable {
 }
 
 func (st *symbolTable) addSymbol(name string, info SymbolInfo) int {
+	isNonterm := info.Kind == SymbolNonterminal
+
+	if isNonterm {
+		// Nonterminals use a separate namespace. A nonterminal named "type"
+		// and a string literal "type" are distinct symbols.
+		if id, ok := st.nontermByName[name]; ok {
+			return id
+		}
+		id := len(st.symbols)
+		st.nontermByName[name] = id
+		st.symbols = append(st.symbols, info)
+		// Also register in byName if no terminal with this name exists,
+		// so Sym("type") lookups work when there's no collision.
+		if _, exists := st.byName[name]; !exists {
+			st.byName[name] = id
+		}
+		return id
+	}
+
+	// Terminals (anonymous, named tokens, externals).
 	if id, ok := st.byName[name]; ok {
 		// If re-registering as a named token (e.g., true: "true"),
-		// upgrade the existing entry from anonymous to named.
-		if info.Named && !st.symbols[id].Named {
+		// upgrade the existing entry from anonymous to named,
+		// but only if it's still a terminal (not a nonterminal).
+		if info.Named && !st.symbols[id].Named && st.symbols[id].Kind != SymbolNonterminal {
 			st.symbols[id].Named = true
 			st.symbols[id].Kind = info.Kind
 		}
@@ -135,9 +158,21 @@ func (st *symbolTable) getOrAdd(name string, info SymbolInfo) int {
 	return st.addSymbol(name, info)
 }
 
+// lookup returns the symbol ID for a name. For ambiguous names where both
+// a terminal and nonterminal exist, it returns the terminal (use lookupNonterm
+// for nonterminals).
 func (st *symbolTable) lookup(name string) (int, bool) {
 	id, ok := st.byName[name]
 	return id, ok
+}
+
+// lookupNonterm returns the nonterminal symbol ID. Falls back to byName
+// for named tokens that are treated like nonterminals in Sym() references.
+func (st *symbolTable) lookupNonterm(name string) (int, bool) {
+	if id, ok := st.nontermByName[name]; ok {
+		return id, ok
+	}
+	return st.lookup(name)
 }
 
 func (st *symbolTable) fieldID(name string) int {
@@ -284,7 +319,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 
 	// Add augmented start production: S' → startRule
 	startName := g.RuleOrder[0]
-	startSym, _ := st.lookup(startName)
+	startSym, _ := st.lookupNonterm(startName)
 	augStartSym := st.addSymbol("_start", SymbolInfo{
 		Name:    "_start",
 		Visible: false,
@@ -306,7 +341,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 		if rule == nil {
 			continue
 		}
-		symID, _ := st.lookup(name)
+		symID, _ := st.lookupNonterm(name)
 		prods := flattenRule2(rule, symID, st, &prodIDCounter)
 		productions = append(productions, prods...)
 	}
@@ -319,7 +354,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 	sort.Strings(auxNames)
 	for _, name := range auxNames {
 		rule := auxRules[name]
-		symID, _ := st.lookup(name)
+		symID, _ := st.lookupNonterm(name)
 		prods := flattenRule2(rule, symID, st, &prodIDCounter)
 		productions = append(productions, prods...)
 	}
@@ -329,7 +364,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 	for _, cgroup := range g.Conflicts {
 		var syms []int
 		for _, name := range cgroup {
-			if id, ok := st.lookup(name); ok {
+			if id, ok := st.lookupNonterm(name); ok {
 				syms = append(syms, id)
 			}
 		}
@@ -339,7 +374,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 	// Phase 9: Resolve supertypes.
 	var supertypes []int
 	for _, name := range g.Supertypes {
-		if id, ok := st.lookup(name); ok {
+		if id, ok := st.lookupNonterm(name); ok {
 			supertypes = append(supertypes, id)
 		}
 	}
@@ -514,7 +549,7 @@ func prepareRule(r *Rule, parentName string, st *symbolTable, auxRules map[strin
 	case RuleRepeat:
 		*counter++
 		auxName := fmt.Sprintf("_%s_repeat%d", parentName, *counter)
-		if _, exists := st.lookup(auxName); !exists {
+		if _, exists := st.lookupNonterm(auxName); !exists {
 			st.addSymbol(auxName, SymbolInfo{
 				Name: auxName, Visible: false, Named: false, Kind: SymbolNonterminal,
 			})
@@ -530,7 +565,7 @@ func prepareRule(r *Rule, parentName string, st *symbolTable, auxRules map[strin
 	case RuleRepeat1:
 		*counter++
 		auxName := fmt.Sprintf("_%s_repeat1_%d", parentName, *counter)
-		if _, exists := st.lookup(auxName); !exists {
+		if _, exists := st.lookupNonterm(auxName); !exists {
 			st.addSymbol(auxName, SymbolInfo{
 				Name: auxName, Visible: false, Named: false, Kind: SymbolNonterminal,
 			})
@@ -614,7 +649,7 @@ func resolveExtras(g *Grammar, st *symbolTable) []int {
 				extras = append(extras, id)
 			}
 		case RuleSymbol:
-			if id, ok := st.lookup(e.Value); ok {
+			if id, ok := st.lookupNonterm(e.Value); ok {
 				extras = append(extras, id)
 			}
 		case RuleString:
@@ -1080,7 +1115,11 @@ func addRuleSymbol(r *Rule, st *symbolTable, rhs *[]int) {
 			*rhs = append(*rhs, id)
 		}
 	case RuleSymbol:
-		if id, ok := st.lookup(r.Value); ok {
+		// Sym("type") should resolve to the nonterminal "type" when it exists,
+		// not the string literal "type". This handles grammars where a rule
+		// name collides with a string literal (e.g., graphql's "type" keyword
+		// vs. type rule).
+		if id, ok := st.lookupNonterm(r.Value); ok {
 			*rhs = append(*rhs, id)
 		}
 	case RulePattern:
