@@ -73,3 +73,51 @@ func AllLanguages() []LangEntry {
 	}
 	return out
 }
+
+// lookupByName returns the LangEntry with the given grammar name, or nil.
+func lookupByName(name string) *LangEntry {
+	for i := range registry {
+		if registry[i].Name == name {
+			return &registry[i]
+		}
+	}
+	return nil
+}
+
+// normalizeLinguistKey lowercases and trims input, preserving special
+// characters (+, #, etc.) so "C++" and "F#" map correctly.
+func normalizeLinguistKey(name string) string {
+	return strings.TrimSpace(strings.ToLower(name))
+}
+
+// DetectLanguageByName returns the LangEntry for any linguist canonical name,
+// alias, or gotreesitter grammar name. Returns nil if unknown.
+//
+// Accepts: "C++", "cpp", "Go", "golang", "Shell", "bash", "F#", "fsharp", etc.
+func DetectLanguageByName(name string) *LangEntry {
+	key := normalizeLinguistKey(name)
+	if grammarName, ok := linguistToGrammar[key]; ok {
+		return lookupByName(grammarName)
+	}
+	return lookupByName(key)
+}
+
+// DisplayName returns the linguist canonical display name for a language
+// (e.g., "C++" for cpp, "JavaScript" for javascript). Falls back to
+// title-casing the grammar name if no linguist match exists.
+func DisplayName(entry *LangEntry) string {
+	if entry == nil {
+		return ""
+	}
+	if dn, ok := grammarDisplayNames[entry.Name]; ok {
+		return dn
+	}
+	// Fallback: title-case with underscores as spaces.
+	words := strings.Split(entry.Name, "_")
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
+}
