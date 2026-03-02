@@ -156,6 +156,13 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 		return nil, fmt.Errorf("grammar has no rules")
 	}
 
+	// Phase 0: Expand inline rules. Rules listed in Grammar.Inline are replaced
+	// at all usage sites with their rule body, then removed as nonterminals.
+	// This must happen before symbol assignment since inline rules don't get IDs.
+	if len(g.Inline) > 0 {
+		g = expandInlineRules(g)
+	}
+
 	st := newSymbolTable()
 	ng := &NormalizedGrammar{}
 
@@ -1082,6 +1089,71 @@ func addRuleSymbol(r *Rule, st *symbolTable, rhs *[]int) {
 			*rhs = append(*rhs, id)
 		}
 	}
+}
+
+// expandInlineRules returns a copy of the grammar with all inline rule
+// references replaced by the rule body. Inline rules are then removed from
+// the rule set so they don't create nonterminal symbols.
+func expandInlineRules(g *Grammar) *Grammar {
+	inlineSet := make(map[string]bool, len(g.Inline))
+	for _, name := range g.Inline {
+		inlineSet[name] = true
+	}
+
+	// Build lookup for inline rule bodies.
+	inlineBodies := make(map[string]*Rule)
+	for _, name := range g.Inline {
+		if rule, ok := g.Rules[name]; ok {
+			inlineBodies[name] = rule
+		}
+	}
+
+	// Create a new grammar without the inline rules.
+	out := NewGrammar(g.Name)
+	for _, name := range g.RuleOrder {
+		if inlineSet[name] {
+			continue // drop inline rules
+		}
+		out.Define(name, substituteInlineRefs(g.Rules[name], inlineBodies))
+	}
+
+	// Copy other fields.
+	for _, extra := range g.Extras {
+		out.Extras = append(out.Extras, substituteInlineRefs(extra, inlineBodies))
+	}
+	out.Conflicts = g.Conflicts
+	for _, ext := range g.Externals {
+		out.Externals = append(out.Externals, substituteInlineRefs(ext, inlineBodies))
+	}
+	out.Word = g.Word
+	out.Supertypes = g.Supertypes
+	// Don't propagate Inline — they've been expanded.
+
+	return out
+}
+
+// substituteInlineRefs replaces RuleSymbol references to inline rules with
+// cloned copies of the inline rule body.
+func substituteInlineRefs(r *Rule, inlineBodies map[string]*Rule) *Rule {
+	if r == nil {
+		return nil
+	}
+	if r.Kind == RuleSymbol {
+		if body, ok := inlineBodies[r.Value]; ok {
+			return cloneRule(body)
+		}
+		return r
+	}
+	// Recurse into children.
+	if len(r.Children) == 0 {
+		return r
+	}
+	out := *r
+	out.Children = make([]*Rule, len(r.Children))
+	for i, c := range r.Children {
+		out.Children[i] = substituteInlineRefs(c, inlineBodies)
+	}
+	return &out
 }
 
 // unwrapPrec strips precedence/associativity wrappers from a rule.

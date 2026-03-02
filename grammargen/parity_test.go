@@ -898,7 +898,7 @@ var importParityGrammars = []importParityGrammar{
 			`{}`, `{"key": "value"}`,
 			`{a: 1}`,
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 13, expectParity: 11,
+		expectImport: true, expectGenerate: true, expectNoErrors: 13, expectParity: 12,
 	},
 	{
 		name: "diff", jsonPath: "/tmp/grammar_parity/diff/src/grammar.json",
