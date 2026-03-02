@@ -180,6 +180,13 @@ type Language struct {
 	ExternalScanner ExternalScanner
 	ExternalSymbols []Symbol // external token index -> symbol
 
+	// ExternalLexStates maps external lex state IDs (from LexMode.ExternalLexState)
+	// to a boolean slice indicating which external tokens are valid. Row 0 is
+	// always all-false (no external tokens valid). When non-nil, this table is
+	// used instead of parse-action-table probing to compute validSymbols for the
+	// external scanner, matching C tree-sitter's ts_external_scanner_states.
+	ExternalLexStates [][]bool
+
 	// InitialState is the parser's start state. In tree-sitter grammars
 	// this is always 1 (state 0 is reserved for error recovery). For
 	// hand-built grammars it defaults to 0.
