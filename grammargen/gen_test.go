@@ -1438,3 +1438,177 @@ func TestGrammarWithBraces(t *testing.T) {
 		t.Errorf("expected 3 numbers in: %s", sexp)
 	}
 }
+
+// ============================================================
+// grammar.js Import Tests
+// ============================================================
+
+const testGrammarJS = `
+module.exports = grammar({
+  name: 'test_import',
+
+  extras: $ => [/\s/],
+
+  rules: {
+    document: $ => repeat($._value),
+
+    _value: $ => choice(
+      $.object,
+      $.array,
+      $.number,
+      $.string,
+      'true',
+      'false',
+      'null'
+    ),
+
+    object: $ => seq(
+      '{',
+      optional(seq(
+        $.pair,
+        repeat(seq(',', $.pair))
+      )),
+      '}'
+    ),
+
+    pair: $ => seq(
+      field('key', $.string),
+      ':',
+      field('value', $._value)
+    ),
+
+    array: $ => seq(
+      '[',
+      optional(seq(
+        $._value,
+        repeat(seq(',', $._value))
+      )),
+      ']'
+    ),
+
+    string: $ => token(seq('"', repeat(/[^"\\]/), '"')),
+
+    number: $ => token(seq(
+      optional('-'),
+      choice('0', seq(/[1-9]/, repeat(/[0-9]/))),
+      optional(seq('.', repeat1(/[0-9]/)))
+    )),
+  }
+});
+`
+
+func TestImportGrammarJS(t *testing.T) {
+	g, err := ImportGrammarJS([]byte(testGrammarJS))
+	if err != nil {
+		t.Fatalf("ImportGrammarJS failed: %v", err)
+	}
+
+	if g.Name != "test_import" {
+		t.Errorf("name = %q, want 'test_import'", g.Name)
+	}
+
+	// Check that rules were extracted.
+	expectedRules := []string{"document", "_value", "object", "pair", "array", "string", "number"}
+	for _, name := range expectedRules {
+		if _, ok := g.Rules[name]; !ok {
+			t.Errorf("missing rule %q", name)
+		}
+	}
+
+	// Check extras.
+	if len(g.Extras) != 1 {
+		t.Errorf("extras count = %d, want 1", len(g.Extras))
+	}
+
+	t.Logf("imported grammar %q with %d rules", g.Name, len(g.Rules))
+}
+
+func TestImportGrammarJSGenerate(t *testing.T) {
+	g, err := ImportGrammarJS([]byte(testGrammarJS))
+	if err != nil {
+		t.Fatalf("ImportGrammarJS failed: %v", err)
+	}
+
+	// Generate should succeed.
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+
+	t.Logf("symbols: %d, states: %d, tokens: %d",
+		lang.SymbolCount, lang.StateCount, lang.TokenCount)
+
+	// Parse a JSON value.
+	parser := gotreesitter.NewParser(lang)
+	tree, parseErr := parser.Parse([]byte(`{"key": [1, true, null]}`))
+	if parseErr != nil {
+		t.Fatalf("parse failed: %v", parseErr)
+	}
+
+	sexp := tree.RootNode().SExpr(lang)
+	t.Logf("parse tree: %s", sexp)
+
+	if strings.Contains(sexp, "ERROR") {
+		t.Errorf("unexpected ERROR in tree: %s", sexp)
+	}
+	if !strings.Contains(sexp, "object") {
+		t.Error("expected 'object' in tree")
+	}
+	if !strings.Contains(sexp, "pair") {
+		t.Error("expected 'pair' in tree")
+	}
+	if !strings.Contains(sexp, "array") {
+		t.Error("expected 'array' in tree")
+	}
+}
+
+const testGrammarJSWithPrec = `
+module.exports = grammar({
+  name: 'calc_import',
+
+  extras: $ => [/\s/],
+
+  rules: {
+    program: $ => repeat($.expression),
+
+    expression: $ => choice(
+      prec.left(1, seq($.expression, '+', $.expression)),
+      prec.left(2, seq($.expression, '*', $.expression)),
+      $.number,
+      seq('(', $.expression, ')')
+    ),
+
+    number: $ => /[0-9]+/,
+  }
+});
+`
+
+func TestImportGrammarJSPrec(t *testing.T) {
+	g, err := ImportGrammarJS([]byte(testGrammarJSWithPrec))
+	if err != nil {
+		t.Fatalf("ImportGrammarJS failed: %v", err)
+	}
+
+	if g.Name != "calc_import" {
+		t.Errorf("name = %q, want 'calc_import'", g.Name)
+	}
+
+	// Generate and parse.
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+
+	parser := gotreesitter.NewParser(lang)
+	tree, parseErr := parser.Parse([]byte("1 + 2 * 3"))
+	if parseErr != nil {
+		t.Fatalf("parse failed: %v", parseErr)
+	}
+
+	sexp := tree.RootNode().SExpr(lang)
+	t.Logf("parse tree: %s", sexp)
+
+	if strings.Contains(sexp, "ERROR") {
+		t.Errorf("unexpected ERROR: %s", sexp)
+	}
+}
