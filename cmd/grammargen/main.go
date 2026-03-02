@@ -1,17 +1,13 @@
-// Command grammargen generates tree-sitter parser artifacts from Go grammar definitions.
+// Command grammargen generates tree-sitter parser artifacts from grammar definitions.
 //
 // Usage:
 //
-//	grammargen [flags] <grammar-name>
+//	grammargen [flags] <grammar-name-or-file>
 //
-// Built-in grammars (for testing/demo):
+// Input sources:
 //
-//	json     - JSON grammar
-//	calc     - Calculator with precedence and associativity
-//	glr      - GLR conflict demo (C-like typedef ambiguity)
-//	keyword  - Keyword/contextual keyword demo
-//	ext      - External scanner slot demo (indent/dedent)
-//	alias    - Alias and supertype demo
+//	<name>        Built-in grammar (json, calc, glr, keyword, ext, alias)
+//	-js <path>    Import a tree-sitter grammar.js file
 //
 // Output formats:
 //
@@ -45,6 +41,7 @@ var builtinGrammars = map[string]func() *grammargen.Grammar{
 func main() {
 	binOut := flag.String("bin", "", "output path for gotreesitter .bin blob")
 	cOut := flag.String("c", "", "output path for tree-sitter parser.c")
+	jsInput := flag.String("js", "", "path to a tree-sitter grammar.js file to import")
 	validate := flag.Bool("validate", false, "validate grammar without generating")
 	report := flag.Bool("report", false, "show generation report with conflict diagnostics")
 	list := flag.Bool("list", false, "list available built-in grammars")
@@ -58,21 +55,44 @@ func main() {
 		os.Exit(0)
 	}
 
-	args := flag.Args()
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: grammargen [flags] <grammar-name>")
-		fmt.Fprintln(os.Stderr, "run with -list to see available grammars")
-		os.Exit(1)
-	}
+	var g *grammargen.Grammar
+	var name string
 
-	name := args[0]
-	fn, ok := builtinGrammars[name]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown grammar %q (use -list to see available grammars)\n", name)
-		os.Exit(1)
-	}
+	if *jsInput != "" {
+		// Import from grammar.js file.
+		source, err := os.ReadFile(*jsInput)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "read %s: %v\n", *jsInput, err)
+			os.Exit(1)
+		}
+		imported, err := grammargen.ImportGrammarJS(source)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "import %s: %v\n", *jsInput, err)
+			os.Exit(1)
+		}
+		g = imported
+		name = g.Name
+		if name == "" {
+			name = *jsInput
+		}
+	} else {
+		// Use built-in grammar.
+		args := flag.Args()
+		if len(args) == 0 {
+			fmt.Fprintln(os.Stderr, "usage: grammargen [flags] <grammar-name>")
+			fmt.Fprintln(os.Stderr, "       grammargen -js <grammar.js> [flags]")
+			fmt.Fprintln(os.Stderr, "run with -list to see available built-in grammars")
+			os.Exit(1)
+		}
 
-	g := fn()
+		name = args[0]
+		fn, ok := builtinGrammars[name]
+		if !ok {
+			fmt.Fprintf(os.Stderr, "unknown grammar %q (use -list to see available, or -js for grammar.js files)\n", name)
+			os.Exit(1)
+		}
+		g = fn()
+	}
 
 	// Validate mode.
 	if *validate {
@@ -87,7 +107,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Also run embedded tests if any.
 		if len(g.Tests) > 0 {
 			fmt.Printf("running %d embedded test(s)...\n", len(g.Tests))
 			if err := grammargen.RunTests(g); err != nil {
