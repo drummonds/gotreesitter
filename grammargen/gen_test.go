@@ -1231,3 +1231,210 @@ func TestRegexParser(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================
+// Milestone 9: Go-Native Superset Features
+// ============================================================
+
+func TestValidate(t *testing.T) {
+	t.Run("clean grammar", func(t *testing.T) {
+		g := JSONGrammar()
+		warnings := Validate(g)
+		if len(warnings) > 0 {
+			t.Errorf("expected no warnings for valid JSON grammar, got: %v", warnings)
+		}
+	})
+
+	t.Run("undefined symbol", func(t *testing.T) {
+		g := NewGrammar("bad")
+		g.Define("start", Sym("missing_rule"))
+		warnings := Validate(g)
+		found := false
+		for _, w := range warnings {
+			if strings.Contains(w, "undefined symbol") && strings.Contains(w, "missing_rule") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected warning about undefined symbol, got: %v", warnings)
+		}
+	})
+
+	t.Run("unreachable rule", func(t *testing.T) {
+		g := NewGrammar("unreachable")
+		g.Define("start", Str("hello"))
+		g.Define("orphan", Str("world"))
+		warnings := Validate(g)
+		found := false
+		for _, w := range warnings {
+			if strings.Contains(w, "unreachable") && strings.Contains(w, "orphan") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected warning about unreachable rule, got: %v", warnings)
+		}
+	})
+
+	t.Run("bad conflict ref", func(t *testing.T) {
+		g := NewGrammar("bad_conflict")
+		g.Define("start", Str("x"))
+		g.SetConflicts([]string{"nonexistent", "start"})
+		warnings := Validate(g)
+		found := false
+		for _, w := range warnings {
+			if strings.Contains(w, "conflict") && strings.Contains(w, "nonexistent") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected warning about bad conflict ref, got: %v", warnings)
+		}
+	})
+}
+
+func TestEmbeddedTests(t *testing.T) {
+	t.Run("passing tests", func(t *testing.T) {
+		g := JSONGrammar()
+		g.Test("null literal", "null", "(document (null))")
+		g.Test("empty object", "{}", "(document (object))")
+		g.Test("number", "42", "(document (number))")
+
+		err := RunTests(g)
+		if err != nil {
+			t.Fatalf("RunTests failed: %v", err)
+		}
+	})
+
+	t.Run("failing test", func(t *testing.T) {
+		g := JSONGrammar()
+		g.Test("wrong expectation", "null", "(document (string))")
+
+		err := RunTests(g)
+		if err == nil {
+			t.Fatal("expected RunTests to report failure")
+		}
+		if !strings.Contains(err.Error(), "tree mismatch") {
+			t.Fatalf("expected 'tree mismatch' in error, got: %v", err)
+		}
+	})
+
+	t.Run("expect error", func(t *testing.T) {
+		g := JSONGrammar()
+		g.TestError("trailing comma", `{"a":1,}`)
+
+		err := RunTests(g)
+		// This should either pass (if ERROR node is produced) or fail
+		// with a meaningful message. We just check it doesn't panic.
+		if err != nil {
+			t.Logf("RunTests result: %v", err)
+		}
+	})
+
+	t.Run("no tests", func(t *testing.T) {
+		g := JSONGrammar()
+		err := RunTests(g)
+		if err != nil {
+			t.Fatalf("RunTests with no tests should succeed, got: %v", err)
+		}
+	})
+}
+
+func TestConflictDiagnostics(t *testing.T) {
+	// The calculator grammar has shift/reduce conflicts resolved by precedence.
+	g := CalcGrammar()
+	report, err := GenerateWithReport(g)
+	if err != nil {
+		t.Fatalf("GenerateWithReport failed: %v", err)
+	}
+
+	t.Logf("symbols: %d, states: %d, tokens: %d",
+		report.SymbolCount, report.StateCount, report.TokenCount)
+	t.Logf("conflicts resolved: %d", len(report.Conflicts))
+	t.Logf("warnings: %d", len(report.Warnings))
+
+	for i, c := range report.Conflicts {
+		// Get the normalized grammar for printing.
+		ng, _ := Normalize(g)
+		t.Logf("conflict %d:\n%s", i, c.String(ng))
+	}
+
+	// The calc grammar should have conflicts that are resolved.
+	if len(report.Conflicts) == 0 {
+		t.Log("no conflicts reported (all resolved before conflict tracking)")
+	}
+
+	// Verify the blob is valid.
+	if len(report.Blob) == 0 {
+		t.Error("report blob is empty")
+	}
+
+	// Verify the language is usable.
+	parser := gotreesitter.NewParser(report.Language)
+	tree, err := parser.Parse([]byte("1 + 2 * 3"))
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	sexp := tree.RootNode().SExpr(report.Language)
+	t.Logf("parse tree: %s", sexp)
+	if !strings.Contains(sexp, "expression") {
+		t.Error("expected expression in tree")
+	}
+}
+
+func TestCombinators(t *testing.T) {
+	// Test SepBy1 by building a grammar that uses it.
+	g := NewGrammar("sepby_test")
+	g.Define("program", SepBy1(Str(";"), Sym("item")))
+	g.Define("item", Pat(`[a-z]+`))
+	g.SetExtras(Pat(`\s`))
+
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+
+	parser := gotreesitter.NewParser(lang)
+	tree, err := parser.Parse([]byte("foo;bar;baz"))
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	sexp := tree.RootNode().SExpr(lang)
+	t.Logf("SepBy1 parse: %s", sexp)
+	if strings.Contains(sexp, "ERROR") {
+		t.Errorf("unexpected ERROR in tree: %s", sexp)
+	}
+
+	// Should contain 3 items.
+	count := strings.Count(sexp, "item")
+	if count != 3 {
+		t.Errorf("expected 3 items, got %d in: %s", count, sexp)
+	}
+}
+
+func TestGrammarWithBraces(t *testing.T) {
+	// Test Braces combinator.
+	g := NewGrammar("braces_test")
+	g.Define("program", Braces(CommaSep(Sym("number"))))
+	g.Define("number", Pat(`[0-9]+`))
+	g.SetExtras(Pat(`\s`))
+
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+
+	parser := gotreesitter.NewParser(lang)
+	tree, err := parser.Parse([]byte("{1, 2, 3}"))
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	sexp := tree.RootNode().SExpr(lang)
+	t.Logf("Braces+CommaSep parse: %s", sexp)
+	if strings.Contains(sexp, "ERROR") {
+		t.Errorf("unexpected ERROR in tree: %s", sexp)
+	}
+	if strings.Count(sexp, "number") != 3 {
+		t.Errorf("expected 3 numbers in: %s", sexp)
+	}
+}

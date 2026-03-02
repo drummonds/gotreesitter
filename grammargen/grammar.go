@@ -35,6 +35,14 @@ type Rule struct {
 	Named    bool    // for alias: whether the alias is a named node
 }
 
+// TestCase is an embedded grammar test case.
+type TestCase struct {
+	Name       string // test name
+	Input      string // input to parse
+	Expected   string // expected S-expression (empty = just check no errors)
+	ExpectError bool  // if true, expect ERROR nodes in the tree
+}
+
 // Grammar is the top-level grammar definition.
 type Grammar struct {
 	Name      string
@@ -46,6 +54,7 @@ type Grammar struct {
 	Inline    []string
 	Word      string
 	Supertypes []string
+	Tests      []TestCase // embedded test cases
 }
 
 // NewGrammar creates a new grammar with the given name.
@@ -181,6 +190,26 @@ func Alias(rule *Rule, name string, named bool) *Rule {
 	return &Rule{Kind: RuleAlias, Value: name, Named: named, Children: []*Rule{rule}}
 }
 
+// Test adds an embedded test case. Input is parsed and the resulting tree
+// is compared against the expected S-expression. If expected is empty,
+// the test only checks that no ERROR nodes appear.
+func (g *Grammar) Test(name, input, expected string) {
+	g.Tests = append(g.Tests, TestCase{
+		Name:     name,
+		Input:    input,
+		Expected: expected,
+	})
+}
+
+// TestError adds an embedded test case that expects parse errors.
+func (g *Grammar) TestError(name, input string) {
+	g.Tests = append(g.Tests, TestCase{
+		Name:        name,
+		Input:       input,
+		ExpectError: true,
+	})
+}
+
 // --- Convenience combinators ---
 
 // CommaSep creates an optional comma-separated list.
@@ -191,4 +220,34 @@ func CommaSep(rule *Rule) *Rule {
 // CommaSep1 creates a non-empty comma-separated list.
 func CommaSep1(rule *Rule) *Rule {
 	return Seq(rule, Repeat(Seq(Str(","), rule)))
+}
+
+// SepBy creates an optional list separated by the given separator.
+func SepBy(sep, rule *Rule) *Rule {
+	return Optional(SepBy1(sep, rule))
+}
+
+// SepBy1 creates a non-empty list separated by the given separator.
+func SepBy1(sep, rule *Rule) *Rule {
+	return Seq(rule, Repeat(Seq(sep, rule)))
+}
+
+// Surround wraps a rule with open and close delimiters.
+func Surround(open, rule, close *Rule) *Rule {
+	return Seq(open, rule, close)
+}
+
+// Parens wraps a rule in parentheses.
+func Parens(rule *Rule) *Rule {
+	return Surround(Str("("), rule, Str(")"))
+}
+
+// Brackets wraps a rule in square brackets.
+func Brackets(rule *Rule) *Rule {
+	return Surround(Str("["), rule, Str("]"))
+}
+
+// Braces wraps a rule in curly braces.
+func Braces(rule *Rule) *Rule {
+	return Surround(Str("{"), rule, Str("}"))
 }
