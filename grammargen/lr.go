@@ -49,6 +49,13 @@ func buildLRTables(ng *NormalizedGrammar) (*LRTables, error) {
 		ng:         ng,
 		firstSets:  make(map[int]map[int]bool),
 		nullables:  make(map[int]bool),
+		prodsByLHS: make(map[int][]int),
+	}
+
+	// Build production-by-LHS index for fast closure lookups.
+	for i := range ng.Productions {
+		lhs := ng.Productions[i].LHS
+		ctx.prodsByLHS[lhs] = append(ctx.prodsByLHS[lhs], i)
 	}
 
 	// Compute FIRST and nullable sets.
@@ -140,6 +147,9 @@ type lrContext struct {
 	ng        *NormalizedGrammar
 	firstSets map[int]map[int]bool // symbol → set of terminal first symbols
 	nullables map[int]bool         // symbol → can derive ε
+
+	// Production index: LHS symbol → production indices
+	prodsByLHS map[int][]int
 
 	// Item set management
 	itemSets  []lrItemSet
@@ -267,11 +277,7 @@ func (ctx *lrContext) closure(items []lrItem) []lrItem {
 		}
 
 		// For each production B → γ, add [B → .γ, b] for b ∈ FIRST(βa).
-		for prodIdx := range ng.Productions {
-			p := &ng.Productions[prodIdx]
-			if p.LHS != nextSym {
-				continue
-			}
+		for _, prodIdx := range ctx.prodsByLHS[nextSym] {
 			for la := range firstBetaA {
 				key := itemKey{prodIdx, 0, la}
 				if !seen[key] {
