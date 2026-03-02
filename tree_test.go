@@ -624,3 +624,54 @@ func TestTreeChangedRanges(t *testing.T) {
 		t.Fatalf("ChangedRanges bytes: got %d-%d, want 1-4", ranges[0].StartByte, ranges[0].EndByte)
 	}
 }
+
+func TestNodeEditFromSubnodeMutatesContainingRoot(t *testing.T) {
+	left := NewLeafNode(Symbol(1), true, 0, 3, Point{Row: 0, Column: 0}, Point{Row: 0, Column: 3})
+	right := NewLeafNode(Symbol(2), true, 3, 6, Point{Row: 0, Column: 3}, Point{Row: 0, Column: 6})
+	root := NewParentNode(Symbol(4), true, []*Node{left, right}, nil, 0)
+	tree := NewTree(root, []byte("abcdef"), testLanguage())
+
+	right.Edit(InputEdit{
+		StartByte:   3,
+		OldEndByte:  4,
+		NewEndByte:  6, // +2 bytes
+		StartPoint:  Point{Row: 0, Column: 3},
+		OldEndPoint: Point{Row: 0, Column: 4},
+		NewEndPoint: Point{Row: 0, Column: 6},
+	})
+
+	// Root and edited subtree should move together.
+	if got, want := tree.RootNode().EndByte(), uint32(8); got != want {
+		t.Fatalf("root.EndByte: got %d, want %d", got, want)
+	}
+	if got, want := right.EndByte(), uint32(8); got != want {
+		t.Fatalf("right.EndByte: got %d, want %d", got, want)
+	}
+	// Unaffected left sibling should remain unchanged.
+	if got, want := left.EndByte(), uint32(3); got != want {
+		t.Fatalf("left.EndByte: got %d, want %d", got, want)
+	}
+	// Node-level edit does not append tree edit history.
+	if got := len(tree.Edits()); got != 0 {
+		t.Fatalf("tree.Edits len: got %d, want 0", got)
+	}
+}
+
+func TestNodeEditDetachedNode(t *testing.T) {
+	n := NewLeafNode(Symbol(1), true, 5, 7, Point{Row: 1, Column: 5}, Point{Row: 1, Column: 7})
+	n.Edit(InputEdit{
+		StartByte:   0,
+		OldEndByte:  0,
+		NewEndByte:  2, // insertion before node => shift by +2
+		StartPoint:  Point{Row: 0, Column: 0},
+		OldEndPoint: Point{Row: 0, Column: 0},
+		NewEndPoint: Point{Row: 0, Column: 2},
+	})
+
+	if got, want := n.StartByte(), uint32(7); got != want {
+		t.Fatalf("StartByte: got %d, want %d", got, want)
+	}
+	if got, want := n.EndByte(), uint32(9); got != want {
+		t.Fatalf("EndByte: got %d, want %d", got, want)
+	}
+}

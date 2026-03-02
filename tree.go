@@ -766,6 +766,22 @@ type InputEdit struct {
 	NewEndPoint Point
 }
 
+// Edit adjusts this node's byte/point span for a source edit.
+//
+// If the node belongs to a larger tree, the edit is applied from the
+// containing root so sibling and ancestor spans remain consistent.
+// Unlike Tree.Edit, this method does not record edit history on a Tree.
+func (n *Node) Edit(edit InputEdit) {
+	if n == nil {
+		return
+	}
+	root := n
+	for root.parent != nil {
+		root = root.parent
+	}
+	editNode(root, edit)
+}
+
 // Edit records an edit on this tree. Call this before ParseIncremental to
 // inform the parser which regions changed. The edit adjusts byte offsets
 // and marks overlapping nodes as dirty so the incremental parser knows
@@ -773,7 +789,7 @@ type InputEdit struct {
 func (t *Tree) Edit(edit InputEdit) {
 	t.edits = append(t.edits, edit)
 	if t.root != nil {
-		editNode(t.root, edit)
+		t.root.Edit(edit)
 	}
 }
 
