@@ -466,6 +466,10 @@ func unicodePropertyRanges(name string) ([]runeRange, error) {
 		table = unicode.Z
 	case "Zs", "Space_Separator":
 		table = unicode.Zs
+	case "Zl", "Line_Separator":
+		table = unicode.Zl
+	case "Zp", "Paragraph_Separator":
+		table = unicode.Zp
 	case "M", "Mark":
 		table = unicode.Mark
 	case "Mn", "Nonspacing_Mark":

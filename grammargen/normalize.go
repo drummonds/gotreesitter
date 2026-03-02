@@ -900,6 +900,16 @@ func flattenTokenInner(r *Rule) (*Rule, error) {
 		return Blank(), nil
 	case RuleBlank:
 		return Blank(), nil
+	case RuleToken, RuleImmToken:
+		// Nested token() inside token() — just unwrap.
+		if len(r.Children) > 0 {
+			return flattenTokenInner(r.Children[0])
+		}
+		return Blank(), nil
+	case RuleSymbol:
+		// Symbol reference inside token — this typically means the token
+		// references another rule. Return as-is; the caller should resolve.
+		return r, nil
 	default:
 		return nil, fmt.Errorf("unexpected rule kind %d inside token", r.Kind)
 	}

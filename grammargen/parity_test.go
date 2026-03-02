@@ -1299,8 +1299,7 @@ var importParityGrammars = []importParityGrammar{
 			`(list 1 2 3)`,
 			`'(a b c)`,
 		},
-		// token() containing repeat — needs support for repeat inside token
-		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 7, expectParity: 6,
 	},
 	{
 		name: "textproto", jsonPath: "/tmp/grammar_parity/textproto/src/grammar.json",
