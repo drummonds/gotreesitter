@@ -407,8 +407,11 @@ GOTREESITTER_GRAMMAR_TRANSITION_INTERN_LIMIT=20000
 **GLR stack cap override**:
 
 ```sh
-GOT_GLR_MAX_STACKS=12  # overrides default GLR stack cap (default: 6)
+GOT_GLR_MAX_STACKS=8  # overrides default GLR stack cap (default: 2)
 ```
+
+Default is tuned for performance. Increase this only if a grammar/workload
+needs more GLR alternatives to preserve parity.
 
 **Legacy benchmark compatibility only**:
 
