@@ -1116,6 +1116,86 @@ func TestAliasSuperParse(t *testing.T) {
 	}
 }
 
+// ── Milestone 8: C parser.c Backend ────────────────────────────────────────────
+
+func TestGenerateCJSON(t *testing.T) {
+	g := JSONGrammar()
+	code, err := GenerateC(g)
+	if err != nil {
+		t.Fatalf("GenerateC failed: %v", err)
+	}
+	if len(code) == 0 {
+		t.Fatal("generated C code is empty")
+	}
+	t.Logf("generated C code: %d bytes", len(code))
+
+	// Verify key components are present.
+	checks := []string{
+		"#include <tree_sitter/parser.h>",
+		"#define LANGUAGE_VERSION",
+		"#define STATE_COUNT",
+		"#define SYMBOL_COUNT",
+		"ts_symbol_names",
+		"ts_symbol_metadata",
+		"ts_parse_actions",
+		"ts_lex_modes",
+		"static bool ts_lex(",
+		"tree_sitter_json",
+	}
+	for _, check := range checks {
+		if !strings.Contains(code, check) {
+			t.Errorf("generated C code missing %q", check)
+		}
+	}
+
+	// Verify field names are present (JSON has key and value fields).
+	if !strings.Contains(code, "field_key") {
+		t.Error("missing field_key")
+	}
+	if !strings.Contains(code, "field_value") {
+		t.Error("missing field_value")
+	}
+}
+
+func TestGenerateCCalc(t *testing.T) {
+	g := CalcGrammar()
+	code, err := GenerateC(g)
+	if err != nil {
+		t.Fatalf("GenerateC failed: %v", err)
+	}
+	if !strings.Contains(code, "tree_sitter_calc") {
+		t.Error("missing tree_sitter_calc export")
+	}
+	t.Logf("generated C code: %d bytes", len(code))
+}
+
+func TestGenerateCExt(t *testing.T) {
+	g := ExtScannerGrammar()
+	code, err := GenerateC(g)
+	if err != nil {
+		t.Fatalf("GenerateC failed: %v", err)
+	}
+	if !strings.Contains(code, "ts_external_scanner_symbol_map") {
+		t.Error("missing external scanner symbol map")
+	}
+	if !strings.Contains(code, "ts_external_scanner_states") {
+		t.Error("missing external scanner states")
+	}
+	t.Logf("generated C code: %d bytes", len(code))
+}
+
+func TestGenerateCAlias(t *testing.T) {
+	g := AliasSuperGrammar()
+	code, err := GenerateC(g)
+	if err != nil {
+		t.Fatalf("GenerateC failed: %v", err)
+	}
+	if !strings.Contains(code, "ts_alias_sequences") {
+		t.Error("missing alias sequences")
+	}
+	t.Logf("generated C code: %d bytes", len(code))
+}
+
 func TestRegexParser(t *testing.T) {
 	tests := []struct {
 		pattern string
