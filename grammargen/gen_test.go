@@ -1612,3 +1612,318 @@ func TestImportGrammarJSPrec(t *testing.T) {
 		t.Errorf("unexpected ERROR: %s", sexp)
 	}
 }
+
+// ============================================================
+// Grammar Composition (ExtendGrammar)
+// ============================================================
+
+func TestExtendGrammar(t *testing.T) {
+	// Start with a simple base grammar.
+	base := NewGrammar("base")
+	base.Define("program", Repeat(Sym("statement")))
+	base.Define("statement", Choice(Sym("assignment"), Sym("expression_statement")))
+	base.Define("assignment", Seq(Sym("identifier"), Str("="), Sym("expression"), Str(";")))
+	base.Define("expression_statement", Seq(Sym("expression"), Str(";")))
+	base.Define("expression", Choice(Sym("number"), Sym("identifier")))
+	base.Define("identifier", Pat(`[a-z]+`))
+	base.Define("number", Pat(`[0-9]+`))
+	base.SetExtras(Pat(`\s`))
+
+	// Extend it: add a print statement, override statement to include it.
+	extended := ExtendGrammar("extended", base, func(g *Grammar) {
+		g.Define("print_statement", Seq(Str("print"), Sym("expression"), Str(";")))
+		g.Define("statement", Choice(
+			Sym("assignment"),
+			Sym("expression_statement"),
+			Sym("print_statement"),
+		))
+	})
+
+	t.Run("inherits base rules", func(t *testing.T) {
+		if _, ok := extended.Rules["assignment"]; !ok {
+			t.Error("missing inherited rule 'assignment'")
+		}
+		if _, ok := extended.Rules["number"]; !ok {
+			t.Error("missing inherited rule 'number'")
+		}
+	})
+
+	t.Run("has new rule", func(t *testing.T) {
+		if _, ok := extended.Rules["print_statement"]; !ok {
+			t.Error("missing new rule 'print_statement'")
+		}
+	})
+
+	t.Run("overrides statement", func(t *testing.T) {
+		stmt := extended.Rules["statement"]
+		if stmt.Kind != RuleChoice || len(stmt.Children) != 3 {
+			t.Errorf("expected statement to be choice with 3 alternatives, got kind=%d, children=%d",
+				stmt.Kind, len(stmt.Children))
+		}
+	})
+
+	t.Run("generates and parses", func(t *testing.T) {
+		lang, err := GenerateLanguage(extended)
+		if err != nil {
+			t.Fatalf("GenerateLanguage failed: %v", err)
+		}
+
+		parser := gotreesitter.NewParser(lang)
+		tree, parseErr := parser.Parse([]byte("print 42;"))
+		if parseErr != nil {
+			t.Fatalf("parse failed: %v", parseErr)
+		}
+		sexp := tree.RootNode().SExpr(lang)
+		t.Logf("parse: %s", sexp)
+		if strings.Contains(sexp, "ERROR") {
+			t.Errorf("unexpected ERROR: %s", sexp)
+		}
+		if !strings.Contains(sexp, "print_statement") {
+			t.Error("expected print_statement in tree")
+		}
+	})
+
+	t.Run("base not mutated", func(t *testing.T) {
+		stmt := base.Rules["statement"]
+		if stmt.Kind != RuleChoice || len(stmt.Children) != 2 {
+			t.Errorf("base grammar was mutated: statement has %d children", len(stmt.Children))
+		}
+	})
+}
+
+// ============================================================
+// Auto Highlight Query Generation
+// ============================================================
+
+func TestGenerateHighlightQuery(t *testing.T) {
+	g := JSONGrammar()
+	query := GenerateHighlightQuery(g)
+
+	t.Logf("highlight query:\n%s", query)
+
+	// JSON grammar should highlight these.
+	if !strings.Contains(query, "@string") {
+		t.Error("expected @string capture")
+	}
+	if !strings.Contains(query, "@number") {
+		t.Error("expected @number capture")
+	}
+	// "true", "false", "null" are string terminals → should become @keyword.
+	if !strings.Contains(query, "@keyword") {
+		t.Error("expected @keyword captures for true/false/null")
+	}
+}
+
+func TestGenerateHighlightQueryCalc(t *testing.T) {
+	g := CalcGrammar()
+	query := GenerateHighlightQuery(g)
+
+	t.Logf("highlight query:\n%s", query)
+
+	if !strings.Contains(query, "@number") {
+		t.Error("expected @number capture for calc grammar")
+	}
+	// Operators +, -, *, / should be detected.
+	if !strings.Contains(query, "@operator") {
+		t.Error("expected @operator captures")
+	}
+}
+
+// ============================================================
+// Grammar Diffing
+// ============================================================
+
+func TestDiffGrammars(t *testing.T) {
+	t.Run("identical grammars", func(t *testing.T) {
+		g := JSONGrammar()
+		diff := DiffGrammars(g, g)
+		if diff.HasChanges() {
+			t.Errorf("expected no changes, got: %s", diff.String())
+		}
+	})
+
+	t.Run("added rule", func(t *testing.T) {
+		old := NewGrammar("test")
+		old.Define("start", Str("hello"))
+
+		new_ := NewGrammar("test")
+		new_.Define("start", Str("hello"))
+		new_.Define("extra", Str("world"))
+
+		diff := DiffGrammars(old, new_)
+		if len(diff.AddedRules) != 1 || diff.AddedRules[0] != "extra" {
+			t.Errorf("expected added rule 'extra', got: %v", diff.AddedRules)
+		}
+		t.Logf("diff:\n%s", diff.String())
+	})
+
+	t.Run("removed rule", func(t *testing.T) {
+		old := NewGrammar("test")
+		old.Define("start", Str("hello"))
+		old.Define("removed", Str("bye"))
+
+		new_ := NewGrammar("test")
+		new_.Define("start", Str("hello"))
+
+		diff := DiffGrammars(old, new_)
+		if len(diff.RemovedRules) != 1 || diff.RemovedRules[0] != "removed" {
+			t.Errorf("expected removed rule 'removed', got: %v", diff.RemovedRules)
+		}
+	})
+
+	t.Run("modified rule", func(t *testing.T) {
+		old := NewGrammar("test")
+		old.Define("start", Str("hello"))
+
+		new_ := NewGrammar("test")
+		new_.Define("start", Str("world"))
+
+		diff := DiffGrammars(old, new_)
+		if len(diff.ModifiedRules) != 1 || diff.ModifiedRules[0] != "start" {
+			t.Errorf("expected modified rule 'start', got: %v", diff.ModifiedRules)
+		}
+	})
+
+	t.Run("extras changed", func(t *testing.T) {
+		old := NewGrammar("test")
+		old.Define("start", Str("x"))
+		old.SetExtras(Pat(`\s`))
+
+		new_ := NewGrammar("test")
+		new_.Define("start", Str("x"))
+		new_.SetExtras(Pat(`\s`), Pat(`//[^\n]*`))
+
+		diff := DiffGrammars(old, new_)
+		if !diff.ExtrasChanged {
+			t.Error("expected extras to be marked as changed")
+		}
+	})
+
+	t.Run("extend produces diff", func(t *testing.T) {
+		base := CalcGrammar()
+		extended := ExtendGrammar("calc_ext", base, func(g *Grammar) {
+			g.Define("modulo", PrecLeft(2, Seq(
+				Sym("expression"), Str("%"), Sym("expression"),
+			)))
+		})
+		diff := DiffGrammars(base, extended)
+		if len(diff.AddedRules) == 0 {
+			t.Error("expected added rules from extension")
+		}
+		t.Logf("diff:\n%s", diff.String())
+	})
+}
+
+// ============================================================
+// Declarative .grammar File Format
+// ============================================================
+
+const testGrammarFile = `
+# A simple expression grammar
+grammar simple_expr
+
+extras = [ /\s/ ]
+
+rule program = repeat(expression)
+rule expression = choice(prec.left(1, seq(expression, "+", expression)), prec.left(2, seq(expression, "*", expression)), number)
+rule number = /[0-9]+/
+`
+
+func TestParseGrammarFile(t *testing.T) {
+	g, err := ParseGrammarFile(testGrammarFile)
+	if err != nil {
+		t.Fatalf("ParseGrammarFile failed: %v", err)
+	}
+
+	if g.Name != "simple_expr" {
+		t.Errorf("name = %q, want 'simple_expr'", g.Name)
+	}
+
+	if len(g.Rules) != 3 {
+		t.Errorf("rules count = %d, want 3", len(g.Rules))
+	}
+
+	if len(g.Extras) != 1 {
+		t.Errorf("extras count = %d, want 1", len(g.Extras))
+	}
+
+	t.Logf("parsed grammar %q with %d rules", g.Name, len(g.Rules))
+}
+
+func TestParseGrammarFileGenerate(t *testing.T) {
+	g, err := ParseGrammarFile(testGrammarFile)
+	if err != nil {
+		t.Fatalf("ParseGrammarFile failed: %v", err)
+	}
+
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+
+	parser := gotreesitter.NewParser(lang)
+	tree, parseErr := parser.Parse([]byte("1 + 2 * 3"))
+	if parseErr != nil {
+		t.Fatalf("parse failed: %v", parseErr)
+	}
+
+	sexp := tree.RootNode().SExpr(lang)
+	t.Logf("parse tree: %s", sexp)
+
+	if strings.Contains(sexp, "ERROR") {
+		t.Errorf("unexpected ERROR: %s", sexp)
+	}
+	if !strings.Contains(sexp, "expression") {
+		t.Error("expected 'expression' in tree")
+	}
+	if !strings.Contains(sexp, "number") {
+		t.Error("expected 'number' in tree")
+	}
+}
+
+const testGrammarFileList = `
+# A list grammar to exercise .grammar format with nesting
+grammar list_file
+
+extras = [ /\s/ ]
+
+rule document = repeat(item)
+rule item = choice(word, group)
+rule group = seq("(", repeat(item), ")")
+rule word = /[a-z]+/
+`
+
+func TestParseGrammarFileList(t *testing.T) {
+	g, err := ParseGrammarFile(testGrammarFileList)
+	if err != nil {
+		t.Fatalf("ParseGrammarFile failed: %v", err)
+	}
+
+	if g.Name != "list_file" {
+		t.Errorf("name = %q, want 'list_file'", g.Name)
+	}
+
+	lang, err := GenerateLanguage(g)
+	if err != nil {
+		t.Fatalf("GenerateLanguage failed: %v", err)
+	}
+
+	parser := gotreesitter.NewParser(lang)
+	tree, parseErr := parser.Parse([]byte("foo (bar baz) qux"))
+	if parseErr != nil {
+		t.Fatalf("parse failed: %v", parseErr)
+	}
+
+	sexp := tree.RootNode().SExpr(lang)
+	t.Logf("parse tree: %s", sexp)
+
+	if strings.Contains(sexp, "ERROR") {
+		t.Errorf("unexpected ERROR: %s", sexp)
+	}
+	if !strings.Contains(sexp, "group") {
+		t.Error("expected 'group' in tree")
+	}
+	if strings.Count(sexp, "word") != 4 {
+		t.Errorf("expected 4 word nodes, got %d in: %s", strings.Count(sexp, "word"), sexp)
+	}
+}

@@ -42,6 +42,8 @@ func main() {
 	binOut := flag.String("bin", "", "output path for gotreesitter .bin blob")
 	cOut := flag.String("c", "", "output path for tree-sitter parser.c")
 	jsInput := flag.String("js", "", "path to a tree-sitter grammar.js file to import")
+	grammarFile := flag.String("grammar", "", "path to a .grammar file to parse")
+	highlight := flag.Bool("highlight", false, "generate a highlight query for the grammar")
 	validate := flag.Bool("validate", false, "validate grammar without generating")
 	report := flag.Bool("report", false, "show generation report with conflict diagnostics")
 	list := flag.Bool("list", false, "list available built-in grammars")
@@ -58,7 +60,8 @@ func main() {
 	var g *grammargen.Grammar
 	var name string
 
-	if *jsInput != "" {
+	switch {
+	case *jsInput != "":
 		// Import from grammar.js file.
 		source, err := os.ReadFile(*jsInput)
 		if err != nil {
@@ -75,12 +78,32 @@ func main() {
 		if name == "" {
 			name = *jsInput
 		}
-	} else {
+
+	case *grammarFile != "":
+		// Parse .grammar file.
+		source, err := os.ReadFile(*grammarFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "read %s: %v\n", *grammarFile, err)
+			os.Exit(1)
+		}
+		parsed, err := grammargen.ParseGrammarFile(string(source))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse %s: %v\n", *grammarFile, err)
+			os.Exit(1)
+		}
+		g = parsed
+		name = g.Name
+		if name == "" {
+			name = *grammarFile
+		}
+
+	default:
 		// Use built-in grammar.
 		args := flag.Args()
 		if len(args) == 0 {
 			fmt.Fprintln(os.Stderr, "usage: grammargen [flags] <grammar-name>")
 			fmt.Fprintln(os.Stderr, "       grammargen -js <grammar.js> [flags]")
+			fmt.Fprintln(os.Stderr, "       grammargen -grammar <file.grammar> [flags]")
 			fmt.Fprintln(os.Stderr, "run with -list to see available built-in grammars")
 			os.Exit(1)
 		}
@@ -88,10 +111,17 @@ func main() {
 		name = args[0]
 		fn, ok := builtinGrammars[name]
 		if !ok {
-			fmt.Fprintf(os.Stderr, "unknown grammar %q (use -list to see available, or -js for grammar.js files)\n", name)
+			fmt.Fprintf(os.Stderr, "unknown grammar %q (use -list, -js, or -grammar)\n", name)
 			os.Exit(1)
 		}
 		g = fn()
+	}
+
+	// Highlight query mode.
+	if *highlight {
+		query := grammargen.GenerateHighlightQuery(g)
+		fmt.Print(query)
+		return
 	}
 
 	// Validate mode.

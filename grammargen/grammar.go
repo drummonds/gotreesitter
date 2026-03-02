@@ -251,3 +251,51 @@ func Brackets(rule *Rule) *Rule {
 func Braces(rule *Rule) *Rule {
 	return Surround(Str("{"), rule, Str("}"))
 }
+
+// --- Grammar composition ---
+
+// ExtendGrammar creates a new grammar that inherits from a base grammar.
+// The customize function receives the new grammar with all base rules copied in,
+// and can override rules, add new ones, or modify extras/conflicts/etc.
+//
+// Example:
+//
+//	cpp := ExtendGrammar("cpp", cGrammar(), func(g *Grammar) {
+//	    g.Define("class_declaration", Seq(Str("class"), Sym("identifier"), Sym("class_body")))
+//	    // Override an existing rule:
+//	    g.Define("declaration", Choice(Sym("class_declaration"), Sym("function_declaration")))
+//	})
+func ExtendGrammar(name string, base *Grammar, customize func(g *Grammar)) *Grammar {
+	g := &Grammar{
+		Name:       name,
+		Rules:      make(map[string]*Rule, len(base.Rules)),
+		RuleOrder:  make([]string, len(base.RuleOrder)),
+		Extras:     make([]*Rule, len(base.Extras)),
+		Conflicts:  make([][]string, len(base.Conflicts)),
+		Externals:  make([]*Rule, len(base.Externals)),
+		Inline:     make([]string, len(base.Inline)),
+		Word:       base.Word,
+		Supertypes: make([]string, len(base.Supertypes)),
+	}
+
+	// Deep copy rules.
+	copy(g.RuleOrder, base.RuleOrder)
+	for k, v := range base.Rules {
+		g.Rules[k] = cloneRule(v)
+	}
+	copy(g.Extras, base.Extras)
+	for i, c := range base.Conflicts {
+		g.Conflicts[i] = make([]string, len(c))
+		copy(g.Conflicts[i], c)
+	}
+	copy(g.Externals, base.Externals)
+	copy(g.Inline, base.Inline)
+	copy(g.Supertypes, base.Supertypes)
+
+	// Let the caller customize.
+	customize(g)
+
+	return g
+}
+
+// cloneRule is defined in regex.go — reused here for grammar composition.
