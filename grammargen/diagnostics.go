@@ -358,6 +358,11 @@ func GenerateWithReport(g *Grammar) (*GenerateReport, error) {
 		}
 	}
 
+	keywordSet := make(map[int]bool, len(ng.KeywordSymbols))
+	for _, ks := range ng.KeywordSymbols {
+		keywordSet[ks] = true
+	}
+
 	lexModes, stateToMode := computeLexModes(
 		tables.StateCount,
 		tokenCount,
@@ -372,6 +377,8 @@ func GenerateWithReport(g *Grammar) (*GenerateReport, error) {
 		ng.ExtraSymbols,
 		immediateTokens,
 		ng.ExternalSymbols,
+		ng.WordSymbolID,
+		keywordSet,
 	)
 
 	lexStates, err := buildLexDFA(ng.Terminals, ng.ExtraSymbols, lexModes)

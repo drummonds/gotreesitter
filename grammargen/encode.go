@@ -38,6 +38,11 @@ func Generate(g *Grammar) ([]byte, error) {
 		}
 	}
 
+	keywordSet := make(map[int]bool, len(ng.KeywordSymbols))
+	for _, ks := range ng.KeywordSymbols {
+		keywordSet[ks] = true
+	}
+
 	lexModes, stateToMode := computeLexModes(
 		tables.StateCount,
 		tokenCount,
@@ -52,6 +57,8 @@ func Generate(g *Grammar) ([]byte, error) {
 		ng.ExtraSymbols,
 		immediateTokens,
 		ng.ExternalSymbols,
+		ng.WordSymbolID,
+		keywordSet,
 	)
 
 	// Phase 5: Build lex DFA per mode.
@@ -143,6 +150,11 @@ func GenerateLanguage(g *Grammar) (*gotreesitter.Language, error) {
 		}
 	}
 
+	keywordSet := make(map[int]bool, len(ng.KeywordSymbols))
+	for _, ks := range ng.KeywordSymbols {
+		keywordSet[ks] = true
+	}
+
 	lexModes, stateToMode := computeLexModes(
 		tables.StateCount,
 		tokenCount,
@@ -157,6 +169,8 @@ func GenerateLanguage(g *Grammar) (*gotreesitter.Language, error) {
 		ng.ExtraSymbols,
 		immediateTokens,
 		ng.ExternalSymbols,
+		ng.WordSymbolID,
+		keywordSet,
 	)
 
 	lexStates, err := buildLexDFA(ng.Terminals, ng.ExtraSymbols, lexModes)

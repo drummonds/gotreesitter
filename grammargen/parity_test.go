@@ -786,6 +786,7 @@ type importParityGrammar struct {
 	jsonPath string                            // path to grammar.json (ImportGrammarJSON) — preferred over path
 	blobFunc func() *gotreesitter.Language      // reference blob loader
 	samples  []string                           // representative parse inputs
+	genTimeout time.Duration                   // per-grammar generation timeout (0 = default 30s)
 	// Expected pass counts at each stage (regression floor — can only increase).
 	expectImport   bool // import should succeed
 	expectGenerate bool // generate should succeed
@@ -1108,14 +1109,25 @@ var importParityGrammars = []importParityGrammar{
 	{
 		name: "nix", jsonPath: "/tmp/grammar_parity/nix/src/grammar.json",
 		blobFunc: grammars.NixLanguage,
+		genTimeout: 60 * time.Second,
 		samples: []string{
 			"42",
 			"true",
 			"null",
 			"{ x = 1; }",
+			`"hello"`,
+			`let x = 1; in x`,
+			`if true then 1 else 2`,
+			`[ 1 2 3 ]`,
+			`x: x + 1`,
+			`{ a = 1; b = 2; }`,
+			`rec { a = b; b = 1; }`,
+			`with import ./foo.nix; x`,
+			`assert true; 42`,
+			`a.b.c`,
+			`a // b`,
 		},
-		// 49 rules → LR table construction exceeds 30s timeout
-		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 15, expectParity: 13,
 	},
 }
 
@@ -1176,8 +1188,12 @@ func TestMultiGrammarImportPipeline(t *testing.T) {
 			importOK++
 			t.Logf("import: %d rules, %d extras, %d externals", len(gram.Rules), len(gram.Extras), len(gram.Externals))
 
-			// Stage 2: Generate (with 30s timeout to avoid LR table hangs)
-			genLang, err := generateWithTimeout(gram, 30*time.Second)
+			// Stage 2: Generate (with timeout to avoid LR table hangs)
+			timeout := g.genTimeout
+			if timeout == 0 {
+				timeout = 30 * time.Second
+			}
+			genLang, err := generateWithTimeout(gram, timeout)
 			if err != nil {
 				if g.expectGenerate {
 					t.Errorf("REGRESSION: generate should succeed but failed: %v", err)

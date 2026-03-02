@@ -413,6 +413,8 @@ func computeLexModes(
 	extraSymbols []int,
 	immediateTokens map[int]bool,
 	externalSymbols []int,
+	wordSymbolID int,
+	keywordSymbols map[int]bool,
 ) ([]lexModeSpec, []int) {
 	extraSet := make(map[int]bool)
 	for _, e := range extraSymbols {
@@ -435,6 +437,7 @@ func computeLexModes(
 		// Collect valid terminal symbols for this state.
 		validSyms := make(map[int]bool)
 		hasImmediate := false
+		hasKeyword := false
 		for sym := 1; sym < tokenCount; sym++ {
 			if extSet[sym] {
 				continue // skip external tokens
@@ -444,7 +447,17 @@ func computeLexModes(
 				if immediateTokens[sym] {
 					hasImmediate = true
 				}
+				if keywordSymbols[sym] {
+					hasKeyword = true
+				}
 			}
+		}
+
+		// When any keyword symbol is valid in this state, include the word
+		// token in the lex mode. Keywords are excluded from the main DFA
+		// and recognized via the word token + keyword promotion DFA.
+		if hasKeyword && wordSymbolID > 0 {
+			validSyms[wordSymbolID] = true
 		}
 
 		// Determine if whitespace should be skipped in this mode.
