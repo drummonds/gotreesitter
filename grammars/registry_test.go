@@ -188,3 +188,44 @@ func TestInferredTagsQueryCoverage(t *testing.T) {
 		t.Fatalf("expected inferred tags query coverage to be >=30 languages, got %d", withTags)
 	}
 }
+
+func TestDetectLanguageByName(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantName string // empty = expect nil
+	}{
+		// Direct grammar name always works (even with empty linguist map).
+		{"go", "go"},
+		{"python", "python"},
+		{"javascript", "javascript"},
+		// Unknown.
+		{"nonexistent_language_xyz", ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := DetectLanguageByName(tt.input)
+		if tt.wantName == "" {
+			if got != nil {
+				t.Errorf("DetectLanguageByName(%q) = %q, want nil", tt.input, got.Name)
+			}
+		} else {
+			if got == nil {
+				t.Errorf("DetectLanguageByName(%q) = nil, want %q", tt.input, tt.wantName)
+			} else if got.Name != tt.wantName {
+				t.Errorf("DetectLanguageByName(%q) = %q, want %q", tt.input, got.Name, tt.wantName)
+			}
+		}
+	}
+}
+
+func TestDisplayName(t *testing.T) {
+	// With empty grammarDisplayNames, falls back to title-case.
+	entry := &LangEntry{Name: "c_sharp"}
+	got := DisplayName(entry)
+	if got != "C Sharp" {
+		t.Errorf("DisplayName(c_sharp) fallback = %q, want %q", got, "C Sharp")
+	}
+	if DisplayName(nil) != "" {
+		t.Error("DisplayName(nil) should return empty string")
+	}
+}
