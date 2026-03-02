@@ -358,6 +358,13 @@ func convertDFAToLexStates(dfa []dfaState, addSkipTransitions bool) []gotreesitt
 // addWhitespaceSkip modifies the start state to have skip transitions for
 // whitespace characters (\t, \n, \r, space). These transitions loop back
 // to the start state with Skip=true.
+//
+// IMPORTANT: We must NOT mark existing DFA transitions as Skip. Existing
+// transitions were created by real terminal patterns (e.g., \r?\n) and must
+// remain non-skip so the lexer can match them as real tokens. We only add
+// NEW skip transitions for whitespace characters that have no existing
+// transition. The DFA already handles whitespace via the extra symbol's
+// accepting states (LexState.Skip = true).
 func addWhitespaceSkip(state *gotreesitter.LexState) {
 	wsRanges := []runeRange{
 		{'\t', '\n'}, // \t and \n
@@ -366,18 +373,21 @@ func addWhitespaceSkip(state *gotreesitter.LexState) {
 	}
 
 	for _, ws := range wsRanges {
-		// Check if an existing transition already covers this range.
-		found := false
+		// Check if ANY existing transition overlaps with this whitespace range.
+		// If so, leave it alone — a real terminal needs that character range.
+		// We only add skip transitions for characters that have no existing
+		// DFA path, because the DFA already handles extras via accept-state
+		// Skip flags.
+		overlaps := false
 		for i := range state.Transitions {
 			t := &state.Transitions[i]
-			if t.Lo <= ws.lo && t.Hi >= ws.hi {
-				// Mark existing transition as skip.
-				t.Skip = true
-				found = true
+			// Check if the ranges overlap at all.
+			if t.Lo <= ws.hi && t.Hi >= ws.lo {
+				overlaps = true
 				break
 			}
 		}
-		if !found {
+		if !overlaps {
 			state.Transitions = append(state.Transitions, gotreesitter.LexTransition{
 				Lo:        ws.lo,
 				Hi:        ws.hi,

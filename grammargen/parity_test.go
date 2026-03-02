@@ -812,7 +812,7 @@ var importParityGrammars = []importParityGrammar{
 			"[main]\nhost=localhost\nport=8080\n",
 			"; comment\n[section]\n",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 3,
 	},
 	{
 		name: "properties", path: "/tmp/grammar_parity/properties/grammar.js",
@@ -823,7 +823,7 @@ var importParityGrammars = []importParityGrammar{
 			"# comment\nkey=value\n",
 			"key1=v1\nkey2=v2\n",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 4,
 	},
 	{
 		name: "requirements", path: "/tmp/grammar_parity/requirements/grammar.js",
@@ -833,7 +833,7 @@ var importParityGrammars = []importParityGrammar{
 			"numpy",
 			"requests>=2.0\nflask",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 1,
+		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 2,
 	},
 	{
 		name: "jsdoc", path: "/tmp/grammar_parity/jsdoc/grammar.js",

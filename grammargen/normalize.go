@@ -181,7 +181,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 		}
 		st.addSymbol(name, SymbolInfo{
 			Name:    name,
-			Visible: false,
+			Visible: true,
 			Named:   false,
 			Kind:    SymbolTerminal,
 		})
@@ -697,7 +697,7 @@ func extractTerminals(g *Grammar, st *symbolTable, stringLits []string, namedTok
 			patterns = append(patterns, TerminalPattern{
 				SymbolID: id,
 				Rule:     expanded,
-				Priority: -1, // lowest priority
+				Priority: priority + 1000, // lowest priority (high number = low priority in DFA)
 			})
 		}
 	}
