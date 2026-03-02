@@ -5,6 +5,7 @@
 package grammars
 
 import (
+	"path"
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
@@ -36,9 +37,10 @@ func Register(entry LangEntry) {
 }
 
 // DetectLanguage returns the LangEntry for a filename, or nil if unknown.
-// Matches by extension first, then shebang.
+// Checks in order: registry extensions, exact filename match (linguist),
+// then linguist extended extensions.
 func DetectLanguage(filename string) *LangEntry {
-	// match by extension
+	// 1. Match by registry extensions (from languages.manifest).
 	for i := range registry {
 		for _, ext := range registry[i].Extensions {
 			if strings.HasSuffix(filename, ext) {
@@ -46,11 +48,28 @@ func DetectLanguage(filename string) *LangEntry {
 			}
 		}
 	}
+
+	// 2. Exact filename match (e.g., "Makefile", "Dockerfile", ".bashrc").
+	base := path.Base(filename)
+	if grammarName, ok := linguistFilenames[base]; ok {
+		return lookupByName(grammarName)
+	}
+
+	// 3. Linguist extended extensions (e.g., ".mk" for make, ".rake" for ruby).
+	ext := strings.ToLower(path.Ext(filename))
+	if ext != "" {
+		if grammarName, ok := linguistExtensions[ext]; ok {
+			return lookupByName(grammarName)
+		}
+	}
+
 	return nil
 }
 
 // DetectLanguageByShebang checks the first line of content for shebang matches.
+// Handles both "#!/usr/bin/env python3" and "#!/usr/bin/python3" forms.
 func DetectLanguageByShebang(firstLine string) *LangEntry {
+	// 1. Registry shebangs (exact prefix match).
 	for i := range registry {
 		for _, shebang := range registry[i].Shebangs {
 			if strings.HasPrefix(firstLine, shebang) {
@@ -58,7 +77,48 @@ func DetectLanguageByShebang(firstLine string) *LangEntry {
 			}
 		}
 	}
+
+	// 2. Extract interpreter from shebang and look up in linguist map.
+	interp := extractInterpreter(firstLine)
+	if interp != "" {
+		if grammarName, ok := linguistInterpreters[interp]; ok {
+			return lookupByName(grammarName)
+		}
+	}
+
 	return nil
+}
+
+// extractInterpreter parses a shebang line and returns the interpreter name.
+// Handles "#!/usr/bin/env python3" → "python3" and "#!/usr/bin/python3" → "python3".
+func extractInterpreter(line string) string {
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "#!") {
+		return ""
+	}
+	line = line[2:]
+	line = strings.TrimSpace(line)
+
+	// Split into path and args.
+	parts := strings.Fields(line)
+	if len(parts) == 0 {
+		return ""
+	}
+
+	// Get the binary name from the path.
+	binary := path.Base(parts[0])
+
+	// If it's "env", the interpreter is the next argument.
+	if binary == "env" {
+		for _, arg := range parts[1:] {
+			if !strings.HasPrefix(arg, "-") {
+				return strings.ToLower(arg)
+			}
+		}
+		return ""
+	}
+
+	return strings.ToLower(binary)
 }
 
 // AllLanguages returns all registered languages.

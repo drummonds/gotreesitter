@@ -45,10 +45,20 @@ func TestAllLanguages(t *testing.T) {
 }
 
 func TestDetectLanguageByShebang(t *testing.T) {
-	// No languages have shebangs registered, so this should return nil.
+	// Linguist interpreter map resolves shebangs.
 	entry := DetectLanguageByShebang("#!/usr/bin/env python3")
+	if entry == nil || entry.Name != "python" {
+		name := ""
+		if entry != nil {
+			name = entry.Name
+		}
+		t.Fatalf("DetectLanguageByShebang(python3) = %q, want %q", name, "python")
+	}
+
+	// Unknown interpreter returns nil.
+	entry = DetectLanguageByShebang("#!/usr/bin/env nonexistent_interp_xyz")
 	if entry != nil {
-		t.Fatalf("expected nil for unregistered shebang, got %q", entry.Name)
+		t.Fatalf("expected nil for unknown interpreter, got %q", entry.Name)
 	}
 }
 
