@@ -795,7 +795,7 @@ type importParityGrammar struct {
 
 var importParityGrammars = []importParityGrammar{
 	{
-		name: "json", path: "/tmp/grammar_parity/json/grammar.js",
+		name: "json", path: "/tmp/grammar_parity/json/grammar.js", jsonPath: "/tmp/grammar_parity/json/src/grammar.json",
 		blobFunc: grammars.JsonLanguage,
 		samples: []string{
 			`{}`, `{"a": 1}`, `[1, 2, 3]`, `"hello"`, `42`, `true`, `null`,
@@ -805,7 +805,7 @@ var importParityGrammars = []importParityGrammar{
 		expectImport: true, expectGenerate: true, expectNoErrors: 9, expectParity: 9,
 	},
 	{
-		name: "ini", path: "/tmp/grammar_parity/ini/grammar.js",
+		name: "ini", path: "/tmp/grammar_parity/ini/grammar.js", jsonPath: "/tmp/grammar_parity/ini/src/grammar.json",
 		blobFunc: grammars.IniLanguage,
 		samples: []string{
 			"[section]\nkey=value\n",
@@ -816,18 +816,21 @@ var importParityGrammars = []importParityGrammar{
 		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 3,
 	},
 	{
-		name: "properties", path: "/tmp/grammar_parity/properties/grammar.js",
+		name: "properties", path: "/tmp/grammar_parity/properties/grammar.js", jsonPath: "/tmp/grammar_parity/properties/src/grammar.json",
 		blobFunc: grammars.PropertiesLanguage,
 		samples: []string{
 			"key=value\n",
 			"key = value\n",
 			"# comment\nkey=value\n",
 			"key1=v1\nkey2=v2\n",
+			"key = value with spaces\n",
+			"! alternative comment\nkey=val\n",
+			"multi.level.key = true\n",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 4,
+		expectImport: true, expectGenerate: true, expectNoErrors: 7, expectParity: 7,
 	},
 	{
-		name: "requirements", path: "/tmp/grammar_parity/requirements/grammar.js",
+		name: "requirements", path: "/tmp/grammar_parity/requirements/grammar.js", jsonPath: "/tmp/grammar_parity/requirements/src/grammar.json",
 		blobFunc: grammars.RequirementsLanguage,
 		samples: []string{
 			"flask==2.0",
@@ -837,7 +840,7 @@ var importParityGrammars = []importParityGrammar{
 		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 2,
 	},
 	{
-		name: "jsdoc", path: "/tmp/grammar_parity/jsdoc/grammar.js",
+		name: "jsdoc", path: "/tmp/grammar_parity/jsdoc/grammar.js", jsonPath: "/tmp/grammar_parity/jsdoc/src/grammar.json",
 		blobFunc: grammars.JsdocLanguage,
 		samples: []string{
 			"@param {string} name",
@@ -846,7 +849,7 @@ var importParityGrammars = []importParityGrammar{
 		expectImport: true, expectGenerate: true, expectNoErrors: 2, expectParity: 0,
 	},
 	{
-		name: "css", path: "/tmp/grammar_parity/css/grammar.js",
+		name: "css", path: "/tmp/grammar_parity/css/grammar.js", jsonPath: "/tmp/grammar_parity/css/src/grammar.json",
 		blobFunc: grammars.CssLanguage,
 		samples: []string{
 			"body { color: red; }",
@@ -855,7 +858,7 @@ var importParityGrammars = []importParityGrammar{
 		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
 	},
 	{
-		name: "html", path: "/tmp/grammar_parity/html/grammar.js",
+		name: "html", path: "/tmp/grammar_parity/html/grammar.js", jsonPath: "/tmp/grammar_parity/html/src/grammar.json",
 		blobFunc: grammars.HtmlLanguage,
 		samples: []string{
 			"<div></div>",
@@ -984,6 +987,23 @@ var importParityGrammars = []importParityGrammar{
 			"[server]\nhost = \"localhost\"\nport = 8080\n",
 		},
 		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 2,
+	},
+	{
+		name: "proto", jsonPath: "/tmp/grammar_parity/proto/src/grammar.json",
+		blobFunc: grammars.ProtoLanguage,
+		samples: []string{
+			`syntax = "proto3";`,
+			"syntax = \"proto3\";\nmessage Foo {\n  string name = 1;\n}",
+			"syntax = \"proto3\";\nenum Color {\n  RED = 0;\n  GREEN = 1;\n}",
+			"syntax = \"proto3\";\npackage mypackage;",
+			"syntax = \"proto3\";\nimport \"other.proto\";",
+			"syntax = \"proto3\";\nmessage Nested {\n  message Inner {\n    int32 x = 1;\n  }\n  Inner inner = 1;\n}",
+			"syntax = \"proto3\";\nservice MyService {\n  rpc GetUser (GetUserRequest) returns (User) {}\n}",
+			"syntax = \"proto3\";\nmessage Foo {\n  repeated string tags = 1;\n  map<string, int32> metadata = 2;\n}",
+			"syntax = \"proto3\";\nmessage Foo {\n  oneof value {\n    string text = 1;\n    int32 number = 2;\n  }\n}",
+			"syntax = \"proto3\";\noption java_package = \"com.example\";\nmessage Empty {}",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 10, expectParity: 10,
 	},
 }
 
