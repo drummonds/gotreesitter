@@ -1005,6 +1005,35 @@ var importParityGrammars = []importParityGrammar{
 		},
 		expectImport: true, expectGenerate: true, expectNoErrors: 10, expectParity: 10,
 	},
+	{
+		name: "comment", jsonPath: "/tmp/grammar_parity/comment/src/grammar.json",
+		blobFunc: grammars.CommentLanguage,
+		samples: []string{
+			"just text",
+			"some random words",
+			"x = 42",
+			"a+b",
+			"",
+			"hello world",
+			"line1\nline2",
+			"  indented text",
+			"foo bar baz qux",
+			"12345",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 10, expectParity: 10,
+	},
+	{
+		name: "pem", jsonPath: "/tmp/grammar_parity/pem/src/grammar.json",
+		blobFunc: grammars.PemLanguage,
+		samples: []string{
+			"",
+			"random text",
+			"BEGIN",
+			"  spaces  ",
+			"multi\nline\ntext",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 5,
+	},
 }
 
 // generateWithTimeout runs GenerateLanguage with a deadline. Returns nil, err
