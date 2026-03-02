@@ -186,7 +186,8 @@ func (q *Query) matchChildStepsRecursive(
 		return false
 	}
 
-	var candidateIndices []int
+	var candidateIndicesBuf [32]int
+	candidateIndices := candidateIndicesBuf[:0]
 	if cs.field != 0 {
 		fieldName := ""
 		if int(cs.field) < len(lang.FieldNames) {
