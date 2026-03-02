@@ -782,7 +782,8 @@ func TestParityJSONBlobRoundTrip(t *testing.T) {
 // importParityGrammar describes a real-world grammar to test against.
 type importParityGrammar struct {
 	name     string
-	path     string                            // path to grammar.js
+	path     string                            // path to grammar.js (ImportGrammarJS)
+	jsonPath string                            // path to grammar.json (ImportGrammarJSON) — preferred over path
 	blobFunc func() *gotreesitter.Language      // reference blob loader
 	samples  []string                           // representative parse inputs
 	// Expected pass counts at each stage (regression floor — can only increase).
@@ -873,6 +874,75 @@ var importParityGrammars = []importParityGrammar{
 		// 208 rules — imports but too large for LR generation in 30s.
 		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
 	},
+	// ── grammar.json imports (canonical resolved form) ──
+	{
+		name: "csv", jsonPath: "/tmp/grammar_parity/csv/csv/src/grammar.json",
+		blobFunc: grammars.CsvLanguage,
+		samples: []string{
+			"a,b,c\n1,2,3\n",
+			"hello,world\n",
+			"1,2.5,true\n",
+			"\"quoted,field\",plain\n",
+			"a\nb\nc\n",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 5,
+	},
+	{
+		name: "json5", jsonPath: "/tmp/grammar_parity/json5/src/grammar.json",
+		blobFunc: grammars.Json5Language,
+		samples: []string{
+			`null`, `true`, `false`,
+			`42`, `-3.14`, `0xFF`,
+			`"hello"`, `'single'`,
+			`[]`, `[1, 2, 3]`,
+			`{}`, `{"key": "value"}`,
+			`{a: 1}`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 13, expectParity: 11,
+	},
+	{
+		name: "diff", jsonPath: "/tmp/grammar_parity/diff/src/grammar.json",
+		blobFunc: grammars.DiffLanguage,
+		samples: []string{
+			"--- a/file.txt\n+++ b/file.txt\n@@ -1,3 +1,3 @@\n-old\n+new\n",
+			"diff --git a/file b/file\n",
+			"+added line\n",
+			"-removed line\n",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 1,
+	},
+	{
+		name: "gitcommit", jsonPath: "/tmp/grammar_parity/gitcommit/src/grammar.json",
+		blobFunc: grammars.GitcommitLanguage,
+		samples: []string{
+			"Initial commit\n",
+			"Fix bug\n\nDetails here\n",
+			"feat: add new feature\n",
+			"# comment only\n",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 2,
+	},
+	{
+		name: "graphql", jsonPath: "/tmp/grammar_parity/graphql/src/grammar.json",
+		blobFunc: grammars.GraphqlLanguage,
+		samples: []string{
+			`{ hero { name } }`,
+			`query { user(id: 1) { name email } }`,
+			`type Query { users: [User] }`,
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 2,
+	},
+	{
+		name: "dot", jsonPath: "/tmp/grammar_parity/dot/src/grammar.json",
+		blobFunc: grammars.DotLanguage,
+		samples: []string{
+			"graph {}",
+			"digraph { a -> b }",
+			"graph G { a -- b; b -- c; }",
+			"digraph { node [shape=box]; a -> b [label=\"edge\"]; }",
+		},
+		expectImport: true, expectGenerate: true, expectNoErrors: 4, expectParity: 0,
+	},
 }
 
 // generateWithTimeout runs GenerateLanguage with a deadline. Returns nil, err
@@ -902,19 +972,30 @@ func TestMultiGrammarImportPipeline(t *testing.T) {
 	for _, g := range importParityGrammars {
 		t.Run(g.name, func(t *testing.T) {
 			totalGrammars++
-			source, err := os.ReadFile(g.path)
-			if err != nil {
-				t.Skipf("grammar.js not available: %v (clone repos to /tmp/grammar_parity/)", err)
-				return
-			}
 
-			// Stage 1: Import
-			gram, err := ImportGrammarJS(source)
-			if err != nil {
+			// Stage 1: Import — prefer grammar.json over grammar.js.
+			var gram *Grammar
+			var importErr error
+			if g.jsonPath != "" {
+				source, err := os.ReadFile(g.jsonPath)
+				if err != nil {
+					t.Skipf("grammar.json not available: %v", err)
+					return
+				}
+				gram, importErr = ImportGrammarJSON(source)
+			} else {
+				source, err := os.ReadFile(g.path)
+				if err != nil {
+					t.Skipf("grammar.js not available: %v (clone repos to /tmp/grammar_parity/)", err)
+					return
+				}
+				gram, importErr = ImportGrammarJS(source)
+			}
+			if importErr != nil {
 				if g.expectImport {
-					t.Errorf("REGRESSION: import should succeed but failed: %v", err)
+					t.Errorf("REGRESSION: import should succeed but failed: %v", importErr)
 				} else {
-					t.Logf("import failed (expected): %v", err)
+					t.Logf("import failed (expected): %v", importErr)
 				}
 				return
 			}
