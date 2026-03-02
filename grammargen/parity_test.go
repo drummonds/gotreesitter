@@ -857,11 +857,15 @@ var importParityGrammars = []importParityGrammar{
 	{
 		name: "css", path: "/tmp/grammar_parity/css/grammar.js", jsonPath: "/tmp/grammar_parity/css/src/grammar.json",
 		blobFunc: grammars.CssLanguage,
+		genTimeout: 90 * time.Second,
 		samples: []string{
 			"body { color: red; }",
 			".class { margin: 0; }",
+			"#id { display: none; }",
+			"h1, h2 { font-size: 2em; }",
+			"* { box-sizing: border-box; }",
 		},
-		expectImport: true, expectGenerate: false, expectNoErrors: 0, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 5, expectParity: 0,
 	},
 	{
 		name: "html", path: "/tmp/grammar_parity/html/grammar.js", jsonPath: "/tmp/grammar_parity/html/src/grammar.json",

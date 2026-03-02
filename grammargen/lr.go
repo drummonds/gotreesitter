@@ -245,6 +245,36 @@ func (ctx *lrContext) closure(items []lrItem) []lrItem {
 		seen[itemKey{item.prodIdx, item.dot, item.lookahead}] = true
 	}
 
+	// Cache FIRST(β) for each (prodIdx, dot) pair — many items share the same
+	// suffix and only differ in lookahead.
+	type betaKey struct{ prodIdx, dot int }
+	type betaResult struct {
+		first    map[int]bool
+		nullable bool
+	}
+	betaCache := make(map[betaKey]*betaResult)
+
+	getBetaFirst := func(item lrItem) *betaResult {
+		bk := betaKey{item.prodIdx, item.dot}
+		if cached, ok := betaCache[bk]; ok {
+			return cached
+		}
+		prod := &ng.Productions[item.prodIdx]
+		beta := prod.RHS[item.dot+1:]
+		result := &betaResult{
+			first:    ctx.firstOfSequence(beta),
+			nullable: true,
+		}
+		for _, sym := range beta {
+			if sym < tokenCount || !ctx.nullables[sym] {
+				result.nullable = false
+				break
+			}
+		}
+		betaCache[bk] = result
+		return result
+	}
+
 	worklist := make([]lrItem, len(items))
 	copy(worklist, items)
 
@@ -263,27 +293,25 @@ func (ctx *lrContext) closure(items []lrItem) []lrItem {
 		}
 
 		// Compute FIRST(β a) where β = prod.RHS[dot+1:] and a = lookahead.
-		beta := prod.RHS[item.dot+1:]
-		firstBetaA := ctx.firstOfSequence(beta)
-		// If β can derive ε, add the lookahead.
-		allNullable := true
-		for _, sym := range beta {
-			if sym < tokenCount || !ctx.nullables[sym] {
-				allNullable = false
-				break
-			}
-		}
-		if allNullable {
-			firstBetaA[item.lookahead] = true
-		}
+		br := getBetaFirst(item)
 
 		// For each production B → γ, add [B → .γ, b] for b ∈ FIRST(βa).
 		for _, prodIdx := range ctx.prodsByLHS[nextSym] {
-			for la := range firstBetaA {
+			for la := range br.first {
 				key := itemKey{prodIdx, 0, la}
 				if !seen[key] {
 					seen[key] = true
 					newItem := lrItem{prodIdx: prodIdx, dot: 0, lookahead: la}
+					items = append(items, newItem)
+					worklist = append(worklist, newItem)
+				}
+			}
+			// If β can derive ε, the lookahead propagates.
+			if br.nullable {
+				key := itemKey{prodIdx, 0, item.lookahead}
+				if !seen[key] {
+					seen[key] = true
+					newItem := lrItem{prodIdx: prodIdx, dot: 0, lookahead: item.lookahead}
 					items = append(items, newItem)
 					worklist = append(worklist, newItem)
 				}
