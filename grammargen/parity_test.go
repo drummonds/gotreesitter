@@ -833,7 +833,7 @@ var importParityGrammars = []importParityGrammar{
 			"numpy",
 			"requests>=2.0\nflask",
 		},
-		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 0,
+		expectImport: true, expectGenerate: true, expectNoErrors: 3, expectParity: 1,
 	},
 	{
 		name: "jsdoc", path: "/tmp/grammar_parity/jsdoc/grammar.js",

@@ -171,6 +171,22 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 		})
 	}
 
+	// Phase 1b: Collect inline patterns (regex nodes inside non-terminal rules
+	// that are NOT wrapped in token()). These become anonymous terminal symbols.
+	inlinePatterns := collectInlinePatterns(g)
+	for _, pat := range inlinePatterns {
+		name := pat // use pattern value as key for lookup
+		if _, ok := st.lookup(name); ok {
+			continue // already registered
+		}
+		st.addSymbol(name, SymbolInfo{
+			Name:    name,
+			Visible: false,
+			Named:   false,
+			Kind:    SymbolTerminal,
+		})
+	}
+
 	// Phase 2: Register named terminals (rules that are token() or token.immediate()
 	// or simple patterns, and rules that resolve to string literals like "true").
 	// Also register nonterminals.
@@ -250,7 +266,7 @@ func Normalize(g *Grammar) (*NormalizedGrammar, error) {
 	}
 
 	// Phase 6: Extract terminal patterns for DFA generation.
-	terminals, err := extractTerminals(g, st, stringLiterals, namedTokens, keywordSet)
+	terminals, err := extractTerminals(g, st, stringLiterals, namedTokens, inlinePatterns, keywordSet)
 	if err != nil {
 		return nil, fmt.Errorf("extract terminals: %w", err)
 	}
@@ -389,6 +405,48 @@ func collectStringLiterals(g *Grammar) []string {
 	// Walk rules in definition order.
 	for _, name := range g.RuleOrder {
 		walk(g.Rules[name], false)
+	}
+	return result
+}
+
+// collectInlinePatterns walks all non-terminal rules and collects RulePattern
+// nodes that appear inline (not inside Token() wrappers and not as top-level
+// terminal rules). These anonymous regex patterns need their own terminal symbols.
+func collectInlinePatterns(g *Grammar) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	var walk func(r *Rule, inToken bool)
+	walk = func(r *Rule, inToken bool) {
+		if r == nil {
+			return
+		}
+		switch r.Kind {
+		case RulePattern:
+			if !inToken && !seen[r.Value] {
+				seen[r.Value] = true
+				result = append(result, r.Value)
+			}
+			return
+		case RuleToken, RuleImmToken:
+			// Patterns inside token() are handled as part of the token, not inline.
+			return
+		}
+		for _, c := range r.Children {
+			walk(c, inToken)
+		}
+	}
+
+	for _, name := range g.RuleOrder {
+		rule := g.Rules[name]
+		if !isTerminalRule(rule) {
+			walk(rule, false)
+		}
+	}
+	// Also check extras for inline patterns (already handled by _whitespace,
+	// but walk for completeness).
+	for _, e := range g.Extras {
+		walk(e, false)
 	}
 	return result
 }
@@ -564,7 +622,7 @@ func resolveExtras(g *Grammar, st *symbolTable) []int {
 // extractTerminals builds TerminalPattern entries for DFA generation.
 // When keywordSet is non-nil, string terminals that are keywords are excluded
 // from the main DFA (they're handled by the keyword DFA instead).
-func extractTerminals(g *Grammar, st *symbolTable, stringLits []string, namedTokens []string, keywordSet map[int]bool) ([]TerminalPattern, error) {
+func extractTerminals(g *Grammar, st *symbolTable, stringLits []string, namedTokens []string, inlinePatterns []string, keywordSet map[int]bool) ([]TerminalPattern, error) {
 	var patterns []TerminalPattern
 	priority := 0
 
@@ -582,6 +640,24 @@ func extractTerminals(g *Grammar, st *symbolTable, stringLits []string, namedTok
 		patterns = append(patterns, TerminalPattern{
 			SymbolID: id,
 			Rule:     Str(s),
+			Priority: priority,
+		})
+		priority++
+	}
+
+	// Inline patterns (regex appearing directly in non-terminal rules, not in token()).
+	for _, pat := range inlinePatterns {
+		id, ok := st.lookup(pat)
+		if !ok {
+			continue
+		}
+		expanded, err := expandPatternRule(pat)
+		if err != nil {
+			return nil, fmt.Errorf("expand inline pattern %q: %w", pat, err)
+		}
+		patterns = append(patterns, TerminalPattern{
+			SymbolID: id,
+			Rule:     expanded,
 			Priority: priority,
 		})
 		priority++
@@ -997,6 +1073,11 @@ func addRuleSymbol(r *Rule, st *symbolTable, rhs *[]int) {
 			*rhs = append(*rhs, id)
 		}
 	case RuleSymbol:
+		if id, ok := st.lookup(r.Value); ok {
+			*rhs = append(*rhs, id)
+		}
+	case RulePattern:
+		// Inline patterns are registered by their pattern value.
 		if id, ok := st.lookup(r.Value); ok {
 			*rhs = append(*rhs, id)
 		}
