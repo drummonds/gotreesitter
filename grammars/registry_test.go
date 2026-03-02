@@ -306,6 +306,97 @@ func TestDetectLanguageByNameAliases(t *testing.T) {
 	}
 }
 
+func TestDetectLanguageFilename(t *testing.T) {
+	tests := []struct {
+		filename string
+		wantName string // empty = expect nil
+	}{
+		// Exact filename matches via linguist.
+		{"Makefile", "make"},
+		{"Dockerfile", "dockerfile"},
+		{"Gemfile", "ruby"},
+		{"Rakefile", "ruby"},
+		{"Vagrantfile", "ruby"},
+		{"Jakefile", "javascript"},
+		{".bashrc", "bash"},
+		{".bash_profile", "bash"},
+		{".zshrc", "bash"},
+		{".profile", "bash"},
+		// With directory prefix.
+		{"/home/user/.bashrc", "bash"},
+		{"some/path/Makefile", "make"},
+		// Extended extensions via linguist.
+		{"build.mk", "make"},
+		{"build.mak", "make"},
+		{"task.rake", "ruby"},
+		{"app.gemspec", "ruby"},
+		{"script.es6", "javascript"},
+		// Standard extensions still work (registry path).
+		{"main.go", "go"},
+		{"app.py", "python"},
+		{"index.js", "javascript"},
+		// Unknown.
+		{"random_file_no_ext", ""},
+		{"something.xyz_unknown", ""},
+	}
+	for _, tt := range tests {
+		got := DetectLanguage(tt.filename)
+		if tt.wantName == "" {
+			if got != nil {
+				t.Errorf("DetectLanguage(%q) = %q, want nil", tt.filename, got.Name)
+			}
+		} else {
+			if got == nil {
+				t.Errorf("DetectLanguage(%q) = nil, want %q", tt.filename, tt.wantName)
+			} else if got.Name != tt.wantName {
+				t.Errorf("DetectLanguage(%q) = %q, want %q", tt.filename, got.Name, tt.wantName)
+			}
+		}
+	}
+}
+
+func TestDetectLanguageByShebangComprehensive(t *testing.T) {
+	tests := []struct {
+		line     string
+		wantName string // empty = expect nil
+	}{
+		// env form.
+		{"#!/usr/bin/env python3", "python"},
+		{"#!/usr/bin/env python", "python"},
+		{"#!/usr/bin/env node", "javascript"},
+		{"#!/usr/bin/env ruby", "ruby"},
+		{"#!/usr/bin/env bash", "bash"},
+		{"#!/usr/bin/env perl", "perl"},
+		{"#!/usr/bin/env lua", "lua"},
+		// Direct path form.
+		{"#!/usr/bin/python3", "python"},
+		{"#!/bin/bash", "bash"},
+		{"#!/bin/sh", "bash"},
+		{"#!/usr/bin/ruby", "ruby"},
+		// env with flags (e.g., env -S).
+		{"#!/usr/bin/env -S python3", "python"},
+		// Not a shebang.
+		{"not a shebang", ""},
+		{"", ""},
+		// Unknown interpreter.
+		{"#!/usr/bin/env nonexistent_xyz", ""},
+	}
+	for _, tt := range tests {
+		got := DetectLanguageByShebang(tt.line)
+		if tt.wantName == "" {
+			if got != nil {
+				t.Errorf("DetectLanguageByShebang(%q) = %q, want nil", tt.line, got.Name)
+			}
+		} else {
+			if got == nil {
+				t.Errorf("DetectLanguageByShebang(%q) = nil, want %q", tt.line, tt.wantName)
+			} else if got.Name != tt.wantName {
+				t.Errorf("DetectLanguageByShebang(%q) = %q, want %q", tt.line, got.Name, tt.wantName)
+			}
+		}
+	}
+}
+
 func TestDisplayNamePopulated(t *testing.T) {
 	tests := []struct {
 		grammar string
