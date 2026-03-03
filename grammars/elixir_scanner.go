@@ -1,6 +1,6 @@
 package grammars
 
-import gotreesitter "github.com/odvcencio/gotreesitter"
+import gotreesitter "github.com/drummonds/gotreesitter"
 
 const (
 	elixirTokQuotedContentISingle = iota

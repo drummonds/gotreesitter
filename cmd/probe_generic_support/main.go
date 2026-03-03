@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/drummonds/gotreesitter"
+	"github.com/drummonds/gotreesitter/grammars"
 )
 
 var parseSmokeSamples = map[string]string{

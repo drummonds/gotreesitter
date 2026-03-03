@@ -10,8 +10,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/drummonds/gotreesitter"
+	"github.com/drummonds/gotreesitter/grammars"
 )
 
 // Run pure-Go benchmarks from this package.

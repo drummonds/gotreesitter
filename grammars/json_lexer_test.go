@@ -3,7 +3,7 @@ package grammars
 import (
 	"testing"
 
-	"github.com/odvcencio/gotreesitter"
+	"github.com/drummonds/gotreesitter"
 )
 
 func TestNewJSONTokenSourceReturnsErrorOnMissingSymbols(t *testing.T) {

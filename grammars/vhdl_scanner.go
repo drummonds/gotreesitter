@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
+	gotreesitter "github.com/drummonds/gotreesitter"
 )
 
 // ---------------------------------------------------------------------------

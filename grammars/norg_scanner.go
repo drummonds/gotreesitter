@@ -3,7 +3,7 @@ package grammars
 import (
 	"unicode"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
+	gotreesitter "github.com/drummonds/gotreesitter"
 )
 
 // Norg external token types. These match the indices into the

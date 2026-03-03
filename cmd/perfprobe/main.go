@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/drummonds/gotreesitter"
+	"github.com/drummonds/gotreesitter/grammars"
 )
 
 type editSite struct {

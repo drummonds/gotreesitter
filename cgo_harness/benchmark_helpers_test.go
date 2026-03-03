@@ -9,7 +9,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
+	gotreesitter "github.com/drummonds/gotreesitter"
 )
 
 func makeGoBenchmarkSource(funcCount int) []byte {

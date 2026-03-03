@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
-	cgoharness "github.com/odvcencio/gotreesitter/cgo_harness"
-	"github.com/odvcencio/gotreesitter/grammars"
+	gotreesitter "github.com/drummonds/gotreesitter"
+	cgoharness "github.com/drummonds/gotreesitter/cgo_harness"
+	"github.com/drummonds/gotreesitter/grammars"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 

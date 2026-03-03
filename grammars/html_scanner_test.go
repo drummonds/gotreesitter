@@ -3,7 +3,7 @@ package grammars
 import (
 	"testing"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
+	gotreesitter "github.com/drummonds/gotreesitter"
 )
 
 func TestHTMLScannerParseCases(t *testing.T) {

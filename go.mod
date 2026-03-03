@@ -1,3 +1,3 @@
-module github.com/odvcencio/gotreesitter
+module github.com/drummonds/gotreesitter
 
 go 1.24.0

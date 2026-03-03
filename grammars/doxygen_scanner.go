@@ -1,6 +1,6 @@
 package grammars
 
-import gotreesitter "github.com/odvcencio/gotreesitter"
+import gotreesitter "github.com/drummonds/gotreesitter"
 
 // External token indexes for the doxygen grammar.
 // These must match the order in the grammar's externals array.

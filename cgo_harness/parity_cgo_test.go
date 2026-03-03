@@ -19,8 +19,8 @@ import (
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
+	gotreesitter "github.com/drummonds/gotreesitter"
+	"github.com/drummonds/gotreesitter/grammars"
 )
 
 type parityMeta struct {

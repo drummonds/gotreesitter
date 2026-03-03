@@ -3,7 +3,7 @@ package grammars
 import (
 	"unicode"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
+	gotreesitter "github.com/drummonds/gotreesitter"
 )
 
 // External token indexes for the wolfram grammar.

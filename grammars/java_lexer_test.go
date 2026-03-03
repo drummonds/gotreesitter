@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/odvcencio/gotreesitter"
+	"github.com/drummonds/gotreesitter"
 )
 
 func TestNewJavaTokenSourceReturnsErrorOnMissingSymbols(t *testing.T) {

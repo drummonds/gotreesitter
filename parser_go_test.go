@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/drummonds/gotreesitter"
+	"github.com/drummonds/gotreesitter/grammars"
 )
 
 // collectNamedTypes does a depth-first traversal collecting the Type() of all

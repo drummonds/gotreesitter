@@ -3,8 +3,8 @@ package gotreesitter_test
 import (
 	"testing"
 
-	"github.com/odvcencio/gotreesitter"
-	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/drummonds/gotreesitter"
+	"github.com/drummonds/gotreesitter/grammars"
 )
 
 func FuzzQueryCompile(f *testing.F) {
