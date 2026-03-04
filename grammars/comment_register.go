@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "comment",
-		Extensions:     nil,
-		Language:       CommentLanguage,
-		HighlightQuery: commentHighlightQuery,
+		Name:               "comment",
+		Extensions:         nil,
+		Language:           CommentLanguage,
+		HighlightQuery:     commentHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("comment"),
 	})
 }

@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "verilog",
-		Extensions:     []string{".v", ".sv", ".svh"},
-		Language:       VerilogLanguage,
-		HighlightQuery: verilogHighlightQuery,
+		Name:               "verilog",
+		Extensions:         []string{".v", ".sv", ".svh"},
+		Language:           VerilogLanguage,
+		HighlightQuery:     verilogHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("verilog"),
 	})
 }

@@ -56,47 +56,47 @@ type AuthzedTokenSource struct {
 	rawStringLitSym gotreesitter.Symbol
 
 	// String split tokens
-	openQuoteSym    gotreesitter.Symbol
-	closeQuoteSym   gotreesitter.Symbol
-	strContentSym   gotreesitter.Symbol
-	escapeSeqSym    gotreesitter.Symbol
+	openQuoteSym  gotreesitter.Symbol
+	closeQuoteSym gotreesitter.Symbol
+	strContentSym gotreesitter.Symbol
+	escapeSeqSym  gotreesitter.Symbol
 
 	// Punctuation
-	dotSym         gotreesitter.Symbol
-	lparenSym      gotreesitter.Symbol
-	rparenSym      gotreesitter.Symbol
-	commaSym       gotreesitter.Symbol
-	lbrackSym      gotreesitter.Symbol
-	rbrackSym      gotreesitter.Symbol
-	lbraceSym      gotreesitter.Symbol
-	rbraceSym      gotreesitter.Symbol
-	equalSym       gotreesitter.Symbol
-	colonSym       gotreesitter.Symbol
+	dotSym    gotreesitter.Symbol
+	lparenSym gotreesitter.Symbol
+	rparenSym gotreesitter.Symbol
+	commaSym  gotreesitter.Symbol
+	lbrackSym gotreesitter.Symbol
+	rbrackSym gotreesitter.Symbol
+	lbraceSym gotreesitter.Symbol
+	rbraceSym gotreesitter.Symbol
+	equalSym  gotreesitter.Symbol
+	colonSym  gotreesitter.Symbol
 
 	// Operators
-	starSym    gotreesitter.Symbol
-	slashSym   gotreesitter.Symbol
-	percentSym gotreesitter.Symbol
-	shlSym     gotreesitter.Symbol
-	shrSym     gotreesitter.Symbol
-	ampSym     gotreesitter.Symbol
+	starSym     gotreesitter.Symbol
+	slashSym    gotreesitter.Symbol
+	percentSym  gotreesitter.Symbol
+	shlSym      gotreesitter.Symbol
+	shrSym      gotreesitter.Symbol
+	ampSym      gotreesitter.Symbol
 	ampCaretSym gotreesitter.Symbol
-	plusSym    gotreesitter.Symbol
-	minusSym   gotreesitter.Symbol
-	pipeSym    gotreesitter.Symbol
-	caretSym   gotreesitter.Symbol
-	eqeqSym    gotreesitter.Symbol
-	neqSym     gotreesitter.Symbol
-	ltSym      gotreesitter.Symbol
-	leSym      gotreesitter.Symbol
-	gtSym      gotreesitter.Symbol
-	geSym      gotreesitter.Symbol
-	landSym    gotreesitter.Symbol
-	lorSym     gotreesitter.Symbol
+	plusSym     gotreesitter.Symbol
+	minusSym    gotreesitter.Symbol
+	pipeSym     gotreesitter.Symbol
+	caretSym    gotreesitter.Symbol
+	eqeqSym     gotreesitter.Symbol
+	neqSym      gotreesitter.Symbol
+	ltSym       gotreesitter.Symbol
+	leSym       gotreesitter.Symbol
+	gtSym       gotreesitter.Symbol
+	geSym       gotreesitter.Symbol
+	landSym     gotreesitter.Symbol
+	lorSym      gotreesitter.Symbol
 
 	// Special
-	stabbySym      gotreesitter.Symbol // ->
-	hashLitSym     gotreesitter.Symbol // #
+	stabbySym       gotreesitter.Symbol // ->
+	hashLitSym      gotreesitter.Symbol // #
 	wildcardTypeSym gotreesitter.Symbol
 
 	// Comment

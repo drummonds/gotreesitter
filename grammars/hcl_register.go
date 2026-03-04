@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "hcl",
-		Extensions:     []string{".hcl", ".tf", ".tfvars"},
-		Language:       HclLanguage,
-		HighlightQuery: hclHighlightQuery,
+		Name:               "hcl",
+		Extensions:         []string{".hcl", ".tf", ".tfvars"},
+		Language:           HclLanguage,
+		HighlightQuery:     hclHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("hcl"),
 	})
 }

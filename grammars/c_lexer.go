@@ -70,9 +70,9 @@ func NewCTokenSource(src []byte, lang *gotreesitter.Language) (*CTokenSource, er
 	}
 
 	ts := &CTokenSource{
-		src:            src,
-		lang:           lang,
-		cur:            newSourceCursor(src),
+		src:  src,
+		lang: lang,
+		cur:  newSourceCursor(src),
 	}
 
 	tl := newTokenLookup(lang, "c")
@@ -270,8 +270,8 @@ func (ts *CTokenSource) buildSymbolTables() {
 	}
 
 	base := &CTokenSource{
-		literalSymbols: literalSymbols,
-		quoteSymbol:    ts.quoteSymbol,
+		literalSymbols:   literalSymbols,
+		quoteSymbol:      ts.quoteSymbol,
 		apostropheSymbol: ts.apostropheSymbol,
 	}
 	stringOpeners := base.collectOpeners([]string{"u8\"", "L\"", "U\"", "u\"", "\""}, ts.quoteSymbol)

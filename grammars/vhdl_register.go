@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "vhdl",
-		Extensions:     []string{".vhd", ".vhdl"},
-		Language:       VhdlLanguage,
-		HighlightQuery: vhdlHighlightQuery,
+		Name:               "vhdl",
+		Extensions:         []string{".vhd", ".vhdl"},
+		Language:           VhdlLanguage,
+		HighlightQuery:     vhdlHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("vhdl"),
 	})
 }

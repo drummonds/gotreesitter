@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "turtle",
-		Extensions:     []string{".ttl"},
-		Language:       TurtleLanguage,
-		HighlightQuery: turtleHighlightQuery,
+		Name:               "turtle",
+		Extensions:         []string{".ttl"},
+		Language:           TurtleLanguage,
+		HighlightQuery:     turtleHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("turtle"),
 	})
 }

@@ -6,24 +6,27 @@ import "testing"
 // language that wraps content between '[' and ']' markers, used for injection tests.
 //
 // Grammar:
-//   document -> LBRACKET content RBRACKET
-//   content  -> TEXT*
+//
+//	document -> LBRACKET content RBRACKET
+//	content  -> TEXT*
 //
 // Symbols:
-//   0: EOF
-//   1: LBRACKET "[" (terminal, anonymous)
-//   2: RBRACKET "]" (terminal, anonymous)
-//   3: TEXT (terminal, named) — any non-bracket character sequence
-//   4: document (nonterminal, named)
-//   5: content (nonterminal, named)
+//
+//	0: EOF
+//	1: LBRACKET "[" (terminal, anonymous)
+//	2: RBRACKET "]" (terminal, anonymous)
+//	3: TEXT (terminal, named) — any non-bracket character sequence
+//	4: document (nonterminal, named)
+//	5: content (nonterminal, named)
 //
 // LR States:
-//   State 0 (start):        LBRACKET -> shift 1, document -> goto 5
-//   State 1 (saw [):        TEXT -> shift 2, RBRACKET -> shift 4, content -> goto 3
-//   State 2 (saw text):     any -> reduce content -> TEXT (1 child)
-//   State 3 (saw content):  RBRACKET -> shift 4
-//   State 4 (saw ]):        any -> reduce document -> LBRACKET content RBRACKET (3 children)
-//   State 5 (saw document): EOF -> accept
+//
+//	State 0 (start):        LBRACKET -> shift 1, document -> goto 5
+//	State 1 (saw [):        TEXT -> shift 2, RBRACKET -> shift 4, content -> goto 3
+//	State 2 (saw text):     any -> reduce content -> TEXT (1 child)
+//	State 3 (saw content):  RBRACKET -> shift 4
+//	State 4 (saw ]):        any -> reduce document -> LBRACKET content RBRACKET (3 children)
+//	State 5 (saw document): EOF -> accept
 func buildContainerLanguage() *Language {
 	return &Language{
 		Name:               "container",

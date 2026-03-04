@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "markdown_inline",
-		Extensions:     nil,
-		Language:       MarkdownInlineLanguage,
-		HighlightQuery: markdownInlineHighlightQuery,
+		Name:               "markdown_inline",
+		Extensions:         nil,
+		Language:           MarkdownInlineLanguage,
+		HighlightQuery:     markdownInlineHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("markdown_inline"),
 	})
 }

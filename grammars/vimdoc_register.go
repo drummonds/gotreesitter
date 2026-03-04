@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "vimdoc",
-		Extensions:     nil,
-		Language:       VimdocLanguage,
-		HighlightQuery: vimdocHighlightQuery,
+		Name:               "vimdoc",
+		Extensions:         nil,
+		Language:           VimdocLanguage,
+		HighlightQuery:     vimdocHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("vimdoc"),
 	})
 }

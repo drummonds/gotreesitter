@@ -10,9 +10,9 @@ import (
 // It focuses on practical coverage for common editor workflows and
 // incremental parsing.
 type TomlTokenSource struct {
-	src  []byte
-	lang *gotreesitter.Language
-	cur  sourceCursor
+	src     []byte
+	lang    *gotreesitter.Language
+	cur     sourceCursor
 	pending []gotreesitter.Token
 
 	done bool
@@ -37,12 +37,12 @@ type TomlTokenSource struct {
 	lbraceSym  gotreesitter.Symbol
 	rbraceSym  gotreesitter.Symbol
 
-	basicStringSym   gotreesitter.Symbol
-	basicQuoteOpen   gotreesitter.Symbol
-	basicQuoteClose  gotreesitter.Symbol
-	basicEscapeSym   gotreesitter.Symbol
-	literalStringSym gotreesitter.Symbol
-	literalQuoteOpen gotreesitter.Symbol
+	basicStringSym    gotreesitter.Symbol
+	basicQuoteOpen    gotreesitter.Symbol
+	basicQuoteClose   gotreesitter.Symbol
+	basicEscapeSym    gotreesitter.Symbol
+	literalStringSym  gotreesitter.Symbol
+	literalQuoteOpen  gotreesitter.Symbol
 	literalQuoteClose gotreesitter.Symbol
 
 	emittedEOFLineEnd bool

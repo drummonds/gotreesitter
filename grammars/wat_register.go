@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "wat",
-		Extensions:     []string{".wat", ".wast"},
-		Language:       WatLanguage,
-		HighlightQuery: watHighlightQuery,
+		Name:               "wat",
+		Extensions:         []string{".wat", ".wast"},
+		Language:           WatLanguage,
+		HighlightQuery:     watHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("wat"),
 	})
 }

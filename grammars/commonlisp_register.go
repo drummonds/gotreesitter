@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "commonlisp",
-		Extensions:     nil,
-		Language:       CommonlispLanguage,
-		HighlightQuery: commonlispHighlightQuery,
+		Name:               "commonlisp",
+		Extensions:         nil,
+		Language:           CommonlispLanguage,
+		HighlightQuery:     commonlispHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("commonlisp"),
 	})
 }

@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "markdown",
-		Extensions:     []string{".md"},
-		Language:       MarkdownLanguage,
-		HighlightQuery: markdownHighlightQuery,
+		Name:               "markdown",
+		Extensions:         []string{".md"},
+		Language:           MarkdownLanguage,
+		HighlightQuery:     markdownHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("markdown"),
 	})
 }

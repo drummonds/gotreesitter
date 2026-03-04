@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "swift",
-		Extensions:     []string{".swift"},
-		Language:       SwiftLanguage,
-		HighlightQuery: swiftHighlightQuery,
+		Name:               "swift",
+		Extensions:         []string{".swift"},
+		Language:           SwiftLanguage,
+		HighlightQuery:     swiftHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("swift"),
 	})
 }

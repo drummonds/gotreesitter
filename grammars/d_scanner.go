@@ -7,19 +7,19 @@ import gotreesitter "github.com/drummonds/gotreesitter"
 // and q"..." delimited strings. Other external tokens (directive,
 // int_literal, etc.) are not handled here.
 const (
-	dTokDirective    = 0
-	dTokIntLiteral   = 1
-	dTokFloatLiteral = 2
-	dTokString       = 3
-	dTokNotIn        = 4
-	dTokNotIs        = 5
-	dTokAfterEof     = 6
+	dTokDirective     = 0
+	dTokIntLiteral    = 1
+	dTokFloatLiteral  = 2
+	dTokString        = 3
+	dTokNotIn         = 4
+	dTokNotIs         = 5
+	dTokAfterEof      = 6
 	dTokErrorSentinel = 7
 )
 
 const (
-	dSymDirective    gotreesitter.Symbol = 221
-	dSymString       gotreesitter.Symbol = 224
+	dSymDirective gotreesitter.Symbol = 221
+	dSymString    gotreesitter.Symbol = 224
 )
 
 // DExternalScanner handles nestable /+ +/ block comments and q"..." delimited strings for D.

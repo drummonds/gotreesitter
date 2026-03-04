@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "csv",
-		Extensions:     nil,
-		Language:       CsvLanguage,
-		HighlightQuery: csvHighlightQuery,
+		Name:               "csv",
+		Extensions:         nil,
+		Language:           CsvLanguage,
+		HighlightQuery:     csvHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("csv"),
 	})
 }

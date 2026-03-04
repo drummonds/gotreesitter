@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "ledger",
-		Extensions:     []string{".ledger", ".journal"},
-		Language:       LedgerLanguage,
-		HighlightQuery: ledgerHighlightQuery,
+		Name:               "ledger",
+		Extensions:         []string{".ledger", ".journal"},
+		Language:           LedgerLanguage,
+		HighlightQuery:     ledgerHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("ledger"),
 	})
 }

@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "vue",
-		Extensions:     []string{".vue"},
-		Language:       VueLanguage,
-		HighlightQuery: vueHighlightQuery,
+		Name:               "vue",
+		Extensions:         []string{".vue"},
+		Language:           VueLanguage,
+		HighlightQuery:     vueHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("vue"),
 	})
 }

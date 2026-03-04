@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "xml",
-		Extensions:     []string{".xml"},
-		Language:       XmlLanguage,
-		HighlightQuery: xmlHighlightQuery,
+		Name:               "xml",
+		Extensions:         []string{".xml"},
+		Language:           XmlLanguage,
+		HighlightQuery:     xmlHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("xml"),
 	})
 }

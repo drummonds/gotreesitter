@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "nushell",
-		Extensions:     []string{".nu"},
-		Language:       NushellLanguage,
-		HighlightQuery: nushellHighlightQuery,
+		Name:               "nushell",
+		Extensions:         []string{".nu"},
+		Language:           NushellLanguage,
+		HighlightQuery:     nushellHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("nushell"),
 	})
 }

@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "hyprlang",
-		Extensions:     []string{".conf"},
-		Language:       HyprlangLanguage,
-		HighlightQuery: hyprlangHighlightQuery,
+		Name:               "hyprlang",
+		Extensions:         []string{".conf"},
+		Language:           HyprlangLanguage,
+		HighlightQuery:     hyprlangHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("hyprlang"),
 	})
 }

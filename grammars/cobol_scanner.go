@@ -8,7 +8,7 @@ import (
 
 // External token indexes for the COBOL grammar.
 const (
-	cobolTokWhiteSpaces      = 0
+	cobolTokWhiteSpaces       = 0
 	cobolTokLinePrefixComment = 1
 	cobolTokLineSuffixComment = 2
 	cobolTokLineComment       = 3
@@ -17,7 +17,7 @@ const (
 )
 
 const (
-	cobolSymWhiteSpaces      gotreesitter.Symbol = 579
+	cobolSymWhiteSpaces       gotreesitter.Symbol = 579
 	cobolSymLinePrefixComment gotreesitter.Symbol = 580
 	cobolSymLineSuffixComment gotreesitter.Symbol = 581
 	cobolSymLineComment       gotreesitter.Symbol = 582

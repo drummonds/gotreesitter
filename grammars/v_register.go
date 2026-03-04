@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "v",
-		Extensions:     []string{".v", ".vsh"},
-		Language:       VLanguage,
-		HighlightQuery: vHighlightQuery,
+		Name:               "v",
+		Extensions:         []string{".v", ".vsh"},
+		Language:           VLanguage,
+		HighlightQuery:     vHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("v"),
 	})
 }

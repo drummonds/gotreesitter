@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "templ",
-		Extensions:     []string{".templ"},
-		Language:       TemplLanguage,
-		HighlightQuery: templHighlightQuery,
+		Name:               "templ",
+		Extensions:         []string{".templ"},
+		Language:           TemplLanguage,
+		HighlightQuery:     templHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("templ"),
 	})
 }

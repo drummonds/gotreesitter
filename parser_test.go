@@ -1334,21 +1334,24 @@ func TestParseRuntimeReportsTokenSourceEOFEarly(t *testing.T) {
 
 // buildReservedWordLanguage constructs a minimal language to test reserved word
 // handling in promoteKeyword. Symbols:
-//   0: EOF
-//   1: IDENT (terminal, named) — keyword capture token
-//   2: KW_IF (terminal, anonymous) — keyword matched by DFA
-//   3: stmt (nonterminal, named)
+//
+//	0: EOF
+//	1: IDENT (terminal, named) — keyword capture token
+//	2: KW_IF (terminal, anonymous) — keyword matched by DFA
+//	3: stmt (nonterminal, named)
 //
 // The keyword lexer DFA recognises "if" and emits symbol 2 (KW_IF).
 //
 // LexModes:
-//   state 0: no lex mode entry (unused)
-//   state 1: ReservedWordSetID=1 → set {KW_IF} → "if" is reserved, not promoted
-//   state 2: ReservedWordSetID=0 → no reserved words → "if" IS promoted
+//
+//	state 0: no lex mode entry (unused)
+//	state 1: ReservedWordSetID=1 → set {KW_IF} → "if" is reserved, not promoted
+//	state 2: ReservedWordSetID=0 → no reserved words → "if" IS promoted
 //
 // ReservedWords layout (stride 2):
-//   set 0 (offset 0): [0, 0]       — empty
-//   set 1 (offset 2): [KW_IF, 0]   — KW_IF is reserved
+//
+//	set 0 (offset 0): [0, 0]       — empty
+//	set 1 (offset 2): [KW_IF, 0]   — KW_IF is reserved
 func buildReservedWordLanguage() *Language {
 	return &Language{
 		Name:                "reserved_word_test",
@@ -1370,7 +1373,7 @@ func buildReservedWordLanguage() *Language {
 			{AcceptToken: 2, Default: -1, EOF: -1},
 		},
 		LexModes: []LexMode{
-			{LexState: 0}, // state 0 — not used in test
+			{LexState: 0},                       // state 0 — not used in test
 			{LexState: 0, ReservedWordSetID: 1}, // state 1 — KW_IF reserved
 			{LexState: 0, ReservedWordSetID: 0}, // state 2 — no reserved words
 		},

@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "asm",
-		Extensions:     []string{".s", ".asm"},
-		Language:       AsmLanguage,
-		HighlightQuery: asmHighlightQuery,
+		Name:               "asm",
+		Extensions:         []string{".s", ".asm"},
+		Language:           AsmLanguage,
+		HighlightQuery:     asmHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("asm"),
 	})
 }

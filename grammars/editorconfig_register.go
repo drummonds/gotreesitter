@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "editorconfig",
-		Extensions:     nil,
-		Language:       EditorconfigLanguage,
-		HighlightQuery: editorconfigHighlightQuery,
+		Name:               "editorconfig",
+		Extensions:         nil,
+		Language:           EditorconfigLanguage,
+		HighlightQuery:     editorconfigHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("editorconfig"),
 	})
 }

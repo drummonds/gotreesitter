@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "cooklang",
-		Extensions:     nil,
-		Language:       CooklangLanguage,
-		HighlightQuery: cooklangHighlightQuery,
+		Name:               "cooklang",
+		Extensions:         nil,
+		Language:           CooklangLanguage,
+		HighlightQuery:     cooklangHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("cooklang"),
 	})
 }

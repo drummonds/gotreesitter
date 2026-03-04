@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "tcl",
-		Extensions:     []string{".tcl"},
-		Language:       TclLanguage,
-		HighlightQuery: tclHighlightQuery,
+		Name:               "tcl",
+		Extensions:         []string{".tcl"},
+		Language:           TclLanguage,
+		HighlightQuery:     tclHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("tcl"),
 	})
 }

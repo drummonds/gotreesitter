@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "matlab",
-		Extensions:     []string{".m", ".mat"},
-		Language:       MatlabLanguage,
-		HighlightQuery: matlabHighlightQuery,
+		Name:               "matlab",
+		Extensions:         []string{".m", ".mat"},
+		Language:           MatlabLanguage,
+		HighlightQuery:     matlabHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("matlab"),
 	})
 }

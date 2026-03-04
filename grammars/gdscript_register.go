@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "gdscript",
-		Extensions:     []string{".gd"},
-		Language:       GdscriptLanguage,
-		HighlightQuery: gdscriptHighlightQuery,
+		Name:               "gdscript",
+		Extensions:         []string{".gd"},
+		Language:           GdscriptLanguage,
+		HighlightQuery:     gdscriptHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("gdscript"),
 	})
 }

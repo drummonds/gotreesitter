@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "yaml",
-		Extensions:     []string{".yaml", ".yml"},
-		Language:       YamlLanguage,
-		HighlightQuery: yamlHighlightQuery,
+		Name:               "yaml",
+		Extensions:         []string{".yaml", ".yml"},
+		Language:           YamlLanguage,
+		HighlightQuery:     yamlHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("yaml"),
 	})
 }

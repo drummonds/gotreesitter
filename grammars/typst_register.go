@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "typst",
-		Extensions:     []string{".typ"},
-		Language:       TypstLanguage,
-		HighlightQuery: typstHighlightQuery,
+		Name:               "typst",
+		Extensions:         []string{".typ"},
+		Language:           TypstLanguage,
+		HighlightQuery:     typstHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("typst"),
 	})
 }

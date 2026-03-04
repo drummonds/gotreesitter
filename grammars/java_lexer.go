@@ -57,9 +57,9 @@ func NewJavaTokenSource(src []byte, lang *gotreesitter.Language) (*JavaTokenSour
 	}
 
 	ts := &JavaTokenSource{
-		src:            src,
-		lang:           lang,
-		cur:            newSourceCursor(src),
+		src:  src,
+		lang: lang,
+		cur:  newSourceCursor(src),
 	}
 
 	tl := newTokenLookup(lang, "java")

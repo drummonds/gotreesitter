@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "dtd",
-		Extensions:     nil,
-		Language:       DtdLanguage,
-		HighlightQuery: dtdHighlightQuery,
+		Name:               "dtd",
+		Extensions:         nil,
+		Language:           DtdLanguage,
+		HighlightQuery:     dtdHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("dtd"),
 	})
 }

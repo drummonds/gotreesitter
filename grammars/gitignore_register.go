@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "gitignore",
-		Extensions:     []string{".gitignore"},
-		Language:       GitignoreLanguage,
-		HighlightQuery: gitignoreHighlightQuery,
+		Name:               "gitignore",
+		Extensions:         []string{".gitignore"},
+		Language:           GitignoreLanguage,
+		HighlightQuery:     gitignoreHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("gitignore"),
 	})
 }

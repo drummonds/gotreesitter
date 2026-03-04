@@ -92,10 +92,10 @@ func (h *bshHeredoc) reset() {
 
 // bshState holds scanner state across parse calls.
 type bshState struct {
-	lastGlobParenDepth   uint8
-	extWasInDoubleQuote  bool
-	extSawOutsideQuote   bool
-	heredocs             []bshHeredoc
+	lastGlobParenDepth  uint8
+	extWasInDoubleQuote bool
+	extSawOutsideQuote  bool
+	heredocs            []bshHeredoc
 }
 
 // BashExternalScanner implements gotreesitter.ExternalScanner for the Bash grammar.
@@ -523,14 +523,14 @@ func bshScanRegex(s *bshState, lexer *gotreesitter.ExternalLexer, validSymbols [
 		lexer.MarkEnd()
 
 		type regexState struct {
-			done                        bool
-			advancedOnce                bool
-			foundNonAlnumDollarUDash    bool
-			lastWasEscape               bool
-			inSingleQuote               bool
-			parenDepth                  uint32
-			bracketDepth                uint32
-			braceDepth                  uint32
+			done                     bool
+			advancedOnce             bool
+			foundNonAlnumDollarUDash bool
+			lastWasEscape            bool
+			inSingleQuote            bool
+			parenDepth               uint32
+			bracketDepth             uint32
+			braceDepth               uint32
 		}
 		st := regexState{}
 

@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "sparql",
-		Extensions:     []string{".rq", ".sparql"},
-		Language:       SparqlLanguage,
-		HighlightQuery: sparqlHighlightQuery,
+		Name:               "sparql",
+		Extensions:         []string{".rq", ".sparql"},
+		Language:           SparqlLanguage,
+		HighlightQuery:     sparqlHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("sparql"),
 	})
 }

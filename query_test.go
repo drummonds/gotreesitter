@@ -2261,7 +2261,9 @@ func buildFieldedTree(lang *Language) *Tree {
 // ---------------------------------------------------------------------------
 
 // buildMultiIdentTree creates a tree with three identifier children under a block:
-//   program > block > [ identifier("foo"), identifier("bar"), identifier("baz") ]
+//
+//	program > block > [ identifier("foo"), identifier("bar"), identifier("baz") ]
+//
 // source: "foo bar baz"
 func buildMultiIdentTree(lang *Language) *Tree {
 	source := []byte("foo bar baz")
@@ -2411,9 +2413,9 @@ func TestAnyEqMatchesPredicates(t *testing.T) {
 
 func TestAnyEqCaptureVsCapture(t *testing.T) {
 	source := []byte("foo bar baz bar")
-	n1 := leaf(Symbol(1), true, 0, 3)   // "foo"
-	n2 := leaf(Symbol(1), true, 4, 7)   // "bar"
-	n3 := leaf(Symbol(1), true, 8, 11)  // "baz"
+	n1 := leaf(Symbol(1), true, 0, 3)     // "foo"
+	n2 := leaf(Symbol(1), true, 4, 7)     // "bar"
+	n3 := leaf(Symbol(1), true, 8, 11)    // "baz"
 	nRef := leaf(Symbol(1), true, 12, 15) // "bar"
 
 	captures := []QueryCapture{
@@ -2445,8 +2447,8 @@ func TestAnyEqCaptureVsCapture(t *testing.T) {
 
 func TestAnyNotEqMatchesPredicates(t *testing.T) {
 	source := []byte("bar bar bar")
-	n1 := leaf(Symbol(1), true, 0, 3) // "bar"
-	n2 := leaf(Symbol(1), true, 4, 7) // "bar"
+	n1 := leaf(Symbol(1), true, 0, 3)  // "bar"
+	n2 := leaf(Symbol(1), true, 4, 7)  // "bar"
 	n3 := leaf(Symbol(1), true, 8, 11) // "bar"
 
 	captures := []QueryCapture{
@@ -2679,10 +2681,10 @@ func TestSelectAdjacentBothDirections(t *testing.T) {
 	// Test adjacency in both directions:
 	// anchor at [5,8), item at [3,5) → item.end==5 == anchor.start==5 → adjacent
 	// anchor at [5,8), item at [8,11) → item.start==8 == anchor.end==8 → adjacent
-	itemBefore := leaf(Symbol(1), true, 3, 5)  // "ab"
-	anchor := leaf(Symbol(1), true, 5, 8)       // "anc" (conceptually)
-	itemAfter := leaf(Symbol(1), true, 8, 11)   // "hor" (conceptually)
-	itemFar := leaf(Symbol(1), true, 12, 14)    // far away
+	itemBefore := leaf(Symbol(1), true, 3, 5) // "ab"
+	anchor := leaf(Symbol(1), true, 5, 8)     // "anc" (conceptually)
+	itemAfter := leaf(Symbol(1), true, 8, 11) // "hor" (conceptually)
+	itemFar := leaf(Symbol(1), true, 12, 14)  // far away
 
 	captures := []QueryCapture{
 		{Name: "items", Node: itemBefore},

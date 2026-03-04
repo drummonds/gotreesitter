@@ -4,10 +4,10 @@ package grammars
 
 func init() {
 	Register(LangEntry{
-		Name:           "graphql",
-		Extensions:     []string{".graphql", ".gql"},
-		Language:       GraphqlLanguage,
-		HighlightQuery: graphqlHighlightQuery,
+		Name:               "graphql",
+		Extensions:         []string{".graphql", ".gql"},
+		Language:           GraphqlLanguage,
+		HighlightQuery:     graphqlHighlightQuery,
 		TokenSourceFactory: defaultTokenSourceFactory("graphql"),
 	})
 }
