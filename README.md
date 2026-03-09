@@ -450,6 +450,15 @@ Next:
 
 Release history and retroactive notes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
+## Links
+
+| | |
+|---|---|
+| Documentation | https://h3-gotreesitter.statichost.page/ |
+| Source (Codeberg) | https://codeberg.org/hum3/gotreesitter |
+| Mirror (GitHub) | https://github.com/drummonds/gotreesitter |
+| Docs repo | https://codeberg.org/hum3/gotreesitter-docs |
+
 ## License
 
 [MIT](LICENSE)
