@@ -8,6 +8,34 @@ tasks:
       - task-plus md2html --file CHANGELOG.md --dst docs
       - cp docs/README.html docs/index.html
 
+  fmt:
+    desc: Format Go code
+    cmds:
+      - gofmt -w .
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./... -count=1
+
+  check:
+    desc: Run fmt, vet, lint, and test
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test
+
   clean:
     desc: Remove generated files
     cmds:

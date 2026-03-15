@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  default: standard
+  exclusions:
+    presets:
+      - std-error-handling
+    paths:
+      # Generated scanner/lexer files from ts2go
+      - grammars/.*_scanner\.go
+      - grammars/.*_lexer\.go
+      # CGo harness (separate build tag, not part of main library)
+      - cgo_harness
+    rules:
+      # Upstream code we don't modify — keep merge-clean
+      - path: "(glr|parser|parser_recovery|parser_reduce|query_compile|query_test|rewrite|incremental|lexer|tree|tagger_integration_test)\\.go"
+        linters: [ineffassign, unused, staticcheck]
+      - path: "cmd/"
+        linters: [ineffassign, staticcheck, errcheck]
+      - path: "grammars/support\\.go"
+        linters: [unused]
