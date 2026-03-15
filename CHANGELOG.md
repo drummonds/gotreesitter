@@ -6,6 +6,9 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for tags and release notes while still in `0.x`.## [0.6.2] - 2026-03-15
 
  - updating linter
+## [0.6.3] - 2026-03-15
+
+ - Fixing --index bug in -docs dir
 
 ## [0.6.1] - 2026-03-04
 
