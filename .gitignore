@@ -30,6 +30,9 @@ cgo_harness/reports/
 .DS_Store
 Thumbs.db
 
+# Generated docs
+docs/*.html
+
 # Worktrees
 .worktrees/
 .claude/settings.json
