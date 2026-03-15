@@ -36,3 +36,5 @@ docs/*.html
 # Worktrees
 .worktrees/
 .claude/settings.json
+.task/
+
