@@ -522,10 +522,6 @@ func wireParentLinksWithScratch(root *Node, scratch *[]*Node) {
 	}
 }
 
-func wireParentLinks(root *Node) {
-	wireParentLinksWithScratch(root, nil)
-}
-
 func newParentNode(arena *nodeArena, sym Symbol, named bool, children []*Node, fieldIDs []FieldID, productionID uint16) *Node {
 	var n *Node
 	if arena == nil {
@@ -550,13 +546,6 @@ func newParentNode(arena *nodeArena, sym Symbol, named bool, children []*Node, f
 // is marked as having an error too.
 func NewParentNode(sym Symbol, named bool, children []*Node, fieldIDs []FieldID, productionID uint16) *Node {
 	return newParentNode(nil, sym, named, children, fieldIDs, productionID)
-}
-
-func symbolVisible(lang *Language, sym Symbol) bool {
-	if lang == nil || int(sym) >= len(lang.SymbolMetadata) {
-		return true
-	}
-	return lang.SymbolMetadata[sym].Visible
 }
 
 func newLeafNodeInArena(arena *nodeArena, sym Symbol, named bool, startByte, endByte uint32, startPoint, endPoint Point) *Node {
