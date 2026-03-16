@@ -249,8 +249,16 @@ func (l *Language) buildSymbolMaps() {
 				continue
 			}
 			sym := Symbol(i)
-			// Keep the first match so duplicate names remain deterministic.
-			if _, exists := l.symbolNameMap[sn]; !exists {
+			if existing, exists := l.symbolNameMap[sn]; exists {
+				// Prefer named symbols over anonymous tokens when names
+				// collide. Query patterns like (account) need the named
+				// AST node, not the keyword token that shares the same name.
+				existingNamed := int(existing) < len(l.SymbolMetadata) && l.SymbolMetadata[existing].Named
+				newNamed := int(sym) < len(l.SymbolMetadata) && l.SymbolMetadata[sym].Named
+				if !existingNamed && newNamed {
+					l.symbolNameMap[sn] = sym
+				}
+			} else {
 				l.symbolNameMap[sn] = sym
 			}
 			if i < tokenCount {

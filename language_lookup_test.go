@@ -17,6 +17,32 @@ func TestSymbolByNameReturnsFirstDuplicate(t *testing.T) {
 	}
 }
 
+func TestSymbolByNamePrefersNamedOverAnonymous(t *testing.T) {
+	// Grammars like goluca have keyword tokens (e.g. "account" named=false)
+	// and AST nodes (e.g. account named=true) sharing the same name.
+	// SymbolByName must return the named symbol so query patterns like
+	// (account) resolve to the AST node, not the keyword token.
+	lang := &Language{
+		TokenCount:  5,
+		SymbolNames: []string{"end", "account", "open", "account", "stmt"},
+		SymbolMetadata: []SymbolMetadata{
+			{Name: "end", Named: true},
+			{Name: "account", Named: false}, // keyword token
+			{Name: "open", Named: false},
+			{Name: "account", Named: true}, // AST node
+			{Name: "stmt", Named: true},
+		},
+	}
+
+	sym, ok := lang.SymbolByName("account")
+	if !ok {
+		t.Fatal("expected account symbol")
+	}
+	if sym != 3 {
+		t.Fatalf("expected named account symbol 3, got %d", sym)
+	}
+}
+
 func TestTokenSymbolsByNameFiltersTerminals(t *testing.T) {
 	lang := &Language{
 		TokenCount:  3,
