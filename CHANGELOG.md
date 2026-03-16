@@ -5,7 +5,10 @@ All notable changes to this project are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for tags and release notes while still in `0.x`.## [0.6.2] - 2026-03-15
 
- - updating linter
+ - updating linter## [0.6.4] - 2026-03-16
+
+ - fixing issues 2 and 3
+
 ## [0.6.3] - 2026-03-15
 
  - Fixing --index bug in -docs dir
