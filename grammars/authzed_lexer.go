@@ -3,7 +3,7 @@ package grammars
 import (
 	"fmt"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // AuthzedTokenSource is a custom lexer for the authzed (SpiceDB/Zanzibar)

@@ -3,7 +3,7 @@ package grammars
 import (
 	"sort"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // ParseQuality summarizes how trustworthy a grammar's parse output is.

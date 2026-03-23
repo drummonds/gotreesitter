@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // GenericTokenSource is a best-effort scanner that maps source text to

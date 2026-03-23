@@ -3,7 +3,7 @@ package grammars
 import (
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 func TestDetectLanguageGo(t *testing.T) {

@@ -3,7 +3,7 @@ package grammars
 import (
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // top50CorrectnessLanguages is a curated broad-coverage correctness gate used

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 var (

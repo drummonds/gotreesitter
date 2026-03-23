@@ -3,7 +3,7 @@ package grammars
 import (
 	"fmt"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // TomlTokenSource is a lightweight lexer bridge for tree-sitter-toml.

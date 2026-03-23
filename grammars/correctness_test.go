@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // sexpr builds a tree-sitter-style S-expression from a parse tree,

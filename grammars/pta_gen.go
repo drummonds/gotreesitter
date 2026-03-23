@@ -2,7 +2,7 @@
 
 package grammars
 
-import "github.com/drummonds/gotreesitter"
+import "codeberg.org/hum3/gotreesitter"
 
 // PtaLanguage returns the pta language definition.
 func PtaLanguage() *gotreesitter.Language {

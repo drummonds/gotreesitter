@@ -2,7 +2,7 @@
 
 package grammars
 
-import "github.com/drummonds/gotreesitter"
+import "codeberg.org/hum3/gotreesitter"
 
 // YabnfLanguage returns the yabnf language definition.
 func YabnfLanguage() *gotreesitter.Language {
