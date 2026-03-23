@@ -8,6 +8,9 @@ for tags and release notes while still in `0.x`.## [0.6.2] - 2026-03-15
  - updating linter## [0.6.4] - 2026-03-16
 
  - fixing issues 2 and 3
+## [0.6.5] - 2026-03-23
+
+ - changing to codeberg
 
 ## [0.6.3] - 2026-03-15
 
