@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // LuaTokenSource is a lexer bridge for tree-sitter-lua.

@@ -11,7 +11,7 @@ import (
 	"encoding/binary"
 	"unicode"
 
-	gotreesitter "github.com/drummonds/gotreesitter"
+	gotreesitter "codeberg.org/hum3/gotreesitter"
 )
 
 // ---------------------------------------------------------------------------

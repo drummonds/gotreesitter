@@ -3,7 +3,7 @@ package grammars
 import (
 	"fmt"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // ParseFile detects the language from filename, parses source, and returns

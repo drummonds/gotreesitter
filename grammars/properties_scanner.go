@@ -1,6 +1,6 @@
 package grammars
 
-import gotreesitter "github.com/drummonds/gotreesitter"
+import gotreesitter "codeberg.org/hum3/gotreesitter"
 
 // External token indexes for the properties grammar.
 const (

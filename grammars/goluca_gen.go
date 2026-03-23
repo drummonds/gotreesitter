@@ -2,7 +2,7 @@
 
 package grammars
 
-import "github.com/drummonds/gotreesitter"
+import "codeberg.org/hum3/gotreesitter"
 
 // GolucaLanguage returns the goluca language definition.
 func GolucaLanguage() *gotreesitter.Language {

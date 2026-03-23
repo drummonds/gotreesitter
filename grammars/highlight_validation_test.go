@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // Languages where the highlight query compiles but the smoke sample is too

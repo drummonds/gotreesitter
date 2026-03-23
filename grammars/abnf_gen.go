@@ -2,7 +2,7 @@
 
 package grammars
 
-import "github.com/drummonds/gotreesitter"
+import "codeberg.org/hum3/gotreesitter"
 
 // AbnfLanguage returns the abnf language definition.
 func AbnfLanguage() *gotreesitter.Language {

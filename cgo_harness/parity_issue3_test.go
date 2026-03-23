@@ -5,7 +5,7 @@ package cgoharness
 import (
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 func firstGoNamedChildByType(root *gotreesitter.Node, lang *gotreesitter.Language, typ string) *gotreesitter.Node {

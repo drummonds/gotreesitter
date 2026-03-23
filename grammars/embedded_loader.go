@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // externalScannerRegistry maps language names (e.g. "javascript") to their

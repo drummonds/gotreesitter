@@ -6,8 +6,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/drummonds/gotreesitter"
-	"github.com/drummonds/gotreesitter/grammars"
+	"codeberg.org/hum3/gotreesitter"
+	"codeberg.org/hum3/gotreesitter/grammars"
 )
 
 var parseSmokeKnownDegraded = map[string]string{

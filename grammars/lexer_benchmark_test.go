@@ -3,7 +3,7 @@ package grammars
 import (
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 func benchmarkTokenize(b *testing.B, src []byte, factory func([]byte, *gotreesitter.Language) gotreesitter.TokenSource, langFn func() *gotreesitter.Language) {

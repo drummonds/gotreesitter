@@ -3,7 +3,7 @@ package grammars
 import (
 	"unicode"
 
-	gotreesitter "github.com/drummonds/gotreesitter"
+	gotreesitter "codeberg.org/hum3/gotreesitter"
 )
 
 // rawStringState stores the delimiter for C++ R"delimiter(...)delimiter" raw strings.

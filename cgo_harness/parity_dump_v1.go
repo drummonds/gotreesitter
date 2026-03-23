@@ -7,7 +7,7 @@ import (
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 
-	gotreesitter "github.com/drummonds/gotreesitter"
+	gotreesitter "codeberg.org/hum3/gotreesitter"
 )
 
 const DumpV1Version = "dump.v1"

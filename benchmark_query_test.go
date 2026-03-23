@@ -3,8 +3,8 @@ package gotreesitter_test
 import (
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
-	"github.com/drummonds/gotreesitter/grammars"
+	"codeberg.org/hum3/gotreesitter"
+	"codeberg.org/hum3/gotreesitter/grammars"
 )
 
 // BenchmarkQueryExec measures query compilation + execution on a 500-function Go file.

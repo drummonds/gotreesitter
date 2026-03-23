@@ -7,7 +7,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/drummonds/gotreesitter"
+	"codeberg.org/hum3/gotreesitter"
 )
 
 // GoTokenSource bridges Go's standard library scanner to tree-sitter's

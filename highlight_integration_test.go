@@ -3,8 +3,8 @@ package gotreesitter_test
 import (
 	"testing"
 
-	"github.com/drummonds/gotreesitter"
-	"github.com/drummonds/gotreesitter/grammars"
+	"codeberg.org/hum3/gotreesitter"
+	"codeberg.org/hum3/gotreesitter/grammars"
 )
 
 func goTokenSourceFactoryForTest(t *testing.T, lang *gotreesitter.Language) func([]byte) gotreesitter.TokenSource {
