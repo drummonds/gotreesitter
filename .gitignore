@@ -37,4 +37,5 @@ docs/*.html
 .worktrees/
 .claude/settings.json
 .task/
+.tp-release-comment
 
