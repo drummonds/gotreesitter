@@ -3,23 +3,41 @@
 All notable changes to this project are documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-for tags and release notes while still in `0.x`.## [0.6.2] - 2026-03-15
+for tags and release notes while still in `0.x`.
 
- - updating linter## [0.6.4] - 2026-03-16
+## [0.6.6] - 2026-03-23
 
- - fixing issues 2 and 3## [0.6.6] - 2026-03-23
-
- - Update CHANGELOG for v0.6.5
+- Changing to codeberg
+- Adding yabnf grammar
 
 ## [0.6.5] - 2026-03-23
 
- - changing to codeberg
+- Changing to codeberg
+- Updating gitignore
+
+## [0.6.4] - 2026-03-16
+
+- Fixing issues 2 and 3
 
 ## [0.6.3] - 2026-03-15
 
- - Fixing --index bug in -docs dir
+- Fixing --index bug in docs dir
+- Updating goluca grammar
+- Add ABNF grammar
+- Updating license
+
+## [0.6.2] - 2026-03-15
+
+- Updating linter
+- Prune unused tree functions
+- Add docs build pipeline and statichost deployment config
+- Add task-plus.yml, links section, update gitignore
 
 ## [0.6.1] - 2026-03-04
+
+- Add beancount highlight query and file extension to registry
+- Add goluca and pta grammars, update module path
+- Prune unused parser functions
 
 ## [0.6.0] - 2026-03-01
 
@@ -77,9 +95,15 @@ for tags and release notes while still in `0.x`.## [0.6.2] - 2026-03-15
 - Initial standalone pure-Go runtime module.
 - External scanner VM foundation and base parser/lexer/tree infrastructure.
 
-[0.6.0]: https://github.com/odvcencio/gotreesitter/compare/v0.5.2...v0.6.0
-[0.5.2]: https://github.com/odvcencio/gotreesitter/compare/v0.5.1...v0.5.2
-[0.5.1]: https://github.com/odvcencio/gotreesitter/compare/v0.4.0...v0.5.1
-[0.4.0]: https://github.com/odvcencio/gotreesitter/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/odvcencio/gotreesitter/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/odvcencio/gotreesitter/compare/v0.1.0...v0.2.0
+[0.6.6]: https://codeberg.org/hum3/gotreesitter/compare/v0.6.5...v0.6.6
+[0.6.5]: https://codeberg.org/hum3/gotreesitter/compare/v0.6.4...v0.6.5
+[0.6.4]: https://codeberg.org/hum3/gotreesitter/compare/v0.6.3...v0.6.4
+[0.6.3]: https://codeberg.org/hum3/gotreesitter/compare/v0.6.2...v0.6.3
+[0.6.2]: https://codeberg.org/hum3/gotreesitter/compare/v0.6.1...v0.6.2
+[0.6.1]: https://codeberg.org/hum3/gotreesitter/compare/v0.6.0...v0.6.1
+[0.6.0]: https://codeberg.org/hum3/gotreesitter/compare/v0.5.2...v0.6.0
+[0.5.2]: https://codeberg.org/hum3/gotreesitter/compare/v0.5.1...v0.5.2
+[0.5.1]: https://codeberg.org/hum3/gotreesitter/compare/v0.4.0...v0.5.1
+[0.4.0]: https://codeberg.org/hum3/gotreesitter/compare/v0.3.0...v0.4.0
+[0.3.0]: https://codeberg.org/hum3/gotreesitter/compare/v0.2.0...v0.3.0
+[0.2.0]: https://codeberg.org/hum3/gotreesitter/compare/v0.1.0...v0.2.0
