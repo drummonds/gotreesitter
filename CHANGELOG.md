@@ -4,6 +4,9 @@ All notable changes to this project are documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for tags and release notes while still in `0.x`.
+## [0.6.7] - 2026-03-24
+
+ - Update yabnf grammar to v0.1.2 and fix CHANGELOG
 
 ## [0.6.6] - 2026-03-23
 
